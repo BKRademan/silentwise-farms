@@ -1,0 +1,104 @@
+# TypeScript and Development Standards
+
+## Core Technologies
+- TypeScript
+- Node.js
+- Next.js App Router
+- React
+- Shadcn UI
+- Radix UI
+- Tailwind CSS
+- Express.js
+
+## Code Structure and Organization
+
+## Database: Azure SQL Database (existing)
+  - Direct connection using `mssql` package
+  - Stored procedures for complex operations
+
+### File Structure
+- Components: exported component → subcomponents → helpers → static content → types
+- Directory naming: lowercase with dashes (e.g., `components/auth-wizard`)
+- Prefer named exports for components
+
+### TypeScript Guidelines
+- Use TypeScript for all code files
+- Prefer interfaces over types for object definitions
+- Avoid enums, use const maps instead
+- Use explicit typing for function parameters and returns
+- Implement functional components with TypeScript interfaces
+
+### Coding Patterns
+- Use functional and declarative programming
+- Avoid class-based components
+- Prefer iteration and modularization over code duplication
+- Use descriptive variable names with auxiliary verbs:
+  - Examples: isLoading, hasError, shouldRefetch
+
+### Syntax Standards
+- Use "function" keyword for pure functions
+- Minimize curly braces in simple conditionals
+- Write declarative JSX
+- Avoid unnecessary wrapper elements
+
+## UI Development
+
+### Component Architecture
+- Leverage Shadcn UI and Radix UI primitives
+- Implement responsive design with Tailwind CSS
+- Follow mobile-first approach
+- Use semantic HTML elements
+
+### Styling
+- Use Tailwind CSS for styling
+- Avoid inline styles
+- Maintain consistent spacing and layout patterns
+- Follow design system tokens
+
+## Performance and Optimization
+
+### React Server Components
+- Minimize 'use client' directives
+- Default to React Server Components
+- Use client components only for:
+  - Web API access
+  - Interactive UI elements
+  - Browser-specific features
+
+### Loading and State Management
+- Wrap client components in Suspense
+- Provide meaningful loading states
+- Use 'nuqs' for URL search parameter state management
+- Implement dynamic imports for non-critical components
+
+### Image Optimization
+- Use WebP format when possible
+- Include explicit width and height
+- Implement lazy loading
+- Optimize for Core Web Vitals
+
+## Best Practices
+
+### Data Fetching
+- Follow Next.js data fetching patterns
+- Implement proper error boundaries
+- Use appropriate caching strategies
+- Handle loading and error states gracefully
+
+### State Management
+- Minimize useState usage
+- Prefer server-side state management
+- Use URL state when appropriate
+- Implement proper data revalidation
+
+### Performance Metrics
+- Optimize for Web Vitals:
+  - Largest Contentful Paint (LCP)
+  - Cumulative Layout Shift (CLS)
+  - First Input Delay (FID)
+
+### Code Quality
+- Write self-documenting code
+- Implement proper error handling
+- Follow DRY principles
+- Maintain consistent code formatting 
