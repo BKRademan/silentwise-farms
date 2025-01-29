@@ -31,23 +31,17 @@ export class ValidationError extends Error {
   }
 }
 
-export async function handleApiRoute<T>(
-  handler: () => Promise<T>
-): Promise<NextResponse<ApiResponse<T>>> {
+export async function handleApiRoute<T>(handler: () => Promise<T>) {
   try {
-    const data = await handler();
-    return successResponse(data);
+    const result = await handler();
+    return successResponse(result);
   } catch (error) {
     console.error('API Error:', error);
     
     if (error instanceof ValidationError) {
-      return errorResponse(error, 400);
+      return errorResponse(error.message, 400);
     }
-    
-    if (error instanceof Error) {
-      return errorResponse(error, 500);
-    }
-    
-    return errorResponse('An unexpected error occurred', 500);
+
+    return errorResponse('Internal server error', 500);
   }
 } 

@@ -53,34 +53,28 @@ export function Filters({ onFiltersChange }: FiltersProps) {
         // First fetch growers
         console.log('🔄 Fetching growers...');
         const growersResponse = await fetch('/api/growers');
+        if (!growersResponse.ok) throw new Error('Failed to fetch growers');
         const growersData = await growersResponse.json();
         
-        if (growersData.success) {
-          const formattedGrowerOptions = growersData.data.map((grower: { ID: number; GrowerName: string }) => ({
-            value: grower.ID.toString(),
-            label: grower.GrowerName || 'Unnamed Grower',
-          }));
-          console.log('✅ Successfully fetched growers:', formattedGrowerOptions.length, 'growers');
-          setGrowers(formattedGrowerOptions);
-          
-          // Then fetch employees after growers are fetched
-          console.log('🔄 Fetching employees...');
-          const employeesResponse = await fetch('/api/employees');
-          const employeesData = await employeesResponse.json();
-          
-          if (employeesData.success) {
-            const formattedEmployeeOptions = employeesData.data.map((employee: { ID: number; Employee: string }) => ({
-              value: employee.ID.toString(),
-              label: employee.Employee || 'Unnamed Employee',
-            }));
-            console.log('✅ Successfully fetched employees:', formattedEmployeeOptions.length, 'employees');
-            setEmployees(formattedEmployeeOptions);
-          } else {
-            console.error('❌ Failed to fetch employees:', employeesData.error);
-          }
-        } else {
-          console.error('❌ Failed to fetch growers:', growersData.error);
-        }
+        const formattedGrowerOptions = growersData.map((grower: { ID: number; GrowerName: string }) => ({
+          value: grower.ID.toString(),
+          label: grower.GrowerName || 'Unnamed Grower',
+        }));
+        console.log('✅ Successfully fetched growers:', formattedGrowerOptions.length, 'growers');
+        setGrowers(formattedGrowerOptions);
+        
+        // Then fetch employees after growers are fetched
+        console.log('🔄 Fetching employees...');
+        const employeesResponse = await fetch('/api/employees');
+        if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
+        const employeesData = await employeesResponse.json();
+        
+        const formattedEmployeeOptions = employeesData.map((employee: { ID: number; Employee: string }) => ({
+          value: employee.ID.toString(),
+          label: employee.Employee || 'Unnamed Employee',
+        }));
+        console.log('✅ Successfully fetched employees:', formattedEmployeeOptions.length, 'employees');
+        setEmployees(formattedEmployeeOptions);
       } catch (error) {
         console.error('❌ Error fetching options:', error);
       }

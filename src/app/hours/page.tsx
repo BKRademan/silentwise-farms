@@ -12,6 +12,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { PDFReportModal } from '@/components/hours/pdf-report-modal';
+import { HourFormDialog } from "@/components/hours/hour-form-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function HoursPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,6 +36,10 @@ export default function HoursPage() {
     employeeName?: string;
   }>();
   const searchParams = useSearchParams();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<HourRecord | undefined>(undefined);
+  const [mode, setMode] = useState<'create' | 'edit'>('create');
 
   // Get selected filter values for the PDF report
   const loadPdfFilters = useCallback(async () => {
@@ -117,9 +132,57 @@ export default function HoursPage() {
     }
   };
 
+  // Function to refresh the table data with current filters
+  const refreshData = useCallback(() => {
+    const currentParams = new URLSearchParams(window.location.search);
+    console.log('🔄 Refreshing data with params:', Object.fromEntries(currentParams));
+    fetchRecords(currentParams);
+  }, [fetchRecords]);
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedRecord(undefined);
+    refreshData(); // Use the refreshData function instead of fetchRecords directly
+  };
+
   const handleRefresh = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    fetchRecords(urlParams);
+    refreshData(); // Use the refreshData function for consistency
+  };
+
+  const handleNewRecord = () => {
+    setMode('create');
+    setSelectedRecord(undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditRecord = (record: HourRecord) => {
+    setMode('edit');
+    setSelectedRecord(record);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteRecord = (record: HourRecord) => {
+    setSelectedRecord(record);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedRecord) return;
+
+    try {
+      const response = await fetch(`/api/hours?id=${selectedRecord.ID}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete record');
+
+      setRecords(records.filter(r => r.ID !== selectedRecord.ID));
+      setIsDeleteDialogOpen(false);
+      setSelectedRecord(undefined);
+      refreshData(); // Use the refreshData function here too
+    } catch (error) {
+      console.error('Error deleting record:', error);
+    }
   };
 
   return (
@@ -147,7 +210,11 @@ export default function HoursPage() {
               <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               <span className="text-sm">PDF Report</span>
             </Button>
-            <Button disabled={isLoading} size="sm" className="h-8 px-2 sm:h-10 sm:px-4">
+            <Button 
+              onClick={handleNewRecord} 
+              size="sm" 
+              className="h-8 px-2 sm:h-10 sm:px-4"
+            >
               <span className="text-sm">New Record</span>
             </Button>
           </div>
@@ -220,7 +287,7 @@ export default function HoursPage() {
           <div className="w-full">
             <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
               <CardContent className="p-0">
-                <HoursTable data={records} onEdit={() => {}} onDelete={() => {}} />
+                <HoursTable data={records} onEdit={handleEditRecord} onDelete={handleDeleteRecord} />
               </CardContent>
             </Card>
           </div>
@@ -233,6 +300,30 @@ export default function HoursPage() {
           filters={pdfFilters || {}}
           analytics={analytics}
         />
+
+        <HourFormDialog
+          open={isDialogOpen}
+          onClose={handleCloseDialog}
+          initialData={selectedRecord}
+          mode={mode}
+          onSuccess={refreshData}
+        />
+
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the hours record
+                for {selectedRecord?.Employee} on {selectedRecord?.Work_Date ? new Date(selectedRecord.Work_Date).toLocaleDateString() : ''}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

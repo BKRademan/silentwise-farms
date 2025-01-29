@@ -6,44 +6,9 @@ import { NextResponse } from 'next/server';
 
 const growerDao = new GrowerDAO();
 
-export async function GET(request: NextRequest) {
-  try {
-    console.log('🔄 Starting grower fetch request...');
-    const growers = await growerDao.findActive();
-    console.log('✅ Successfully fetched growers from database');
-
-    return NextResponse.json({
-      success: true,
-      data: growers
-    });
-  } catch (error) {
-    console.error('❌ Error in /api/growers GET:', error);
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
-
-    // Determine if it's a connection error
-    const isConnectionError = error instanceof Error && 
-      (error.message.includes('Connection is closed') || 
-       error.message.includes('Failed to connect') ||
-       error.message.includes('Connection lost'));
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: isConnectionError ? 'Database connection error' : 'Failed to fetch growers',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { 
-        status: isConnectionError ? 503 : 500 // Use 503 Service Unavailable for connection issues
-      }
-    );
-  }
+export async function GET() {
+  const growers = await growerDao.findActive();
+  return NextResponse.json(growers);
 }
 
 export async function POST(request: NextRequest) {

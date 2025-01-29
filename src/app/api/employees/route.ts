@@ -6,34 +6,9 @@ import { NextResponse } from 'next/server';
 
 const employeeDao = new EmployeeDAO();
 
-export async function GET(request: NextRequest) {
-  try {
-    console.log('🔄 Starting employee fetch request...');
-    const employees = await employeeDao.findActive();
-    console.log('✅ Successfully fetched employees from database');
-
-    return NextResponse.json({
-      success: true,
-      data: employees
-    });
-  } catch (error) {
-    console.error('❌ Error in /api/employees GET:', error);
-    // Log more details about the error
-    if (error instanceof Error) {
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-    }
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch employees',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
+export async function GET() {
+  const employees = await employeeDao.findActive();
+  return NextResponse.json(employees);
 }
 
 export async function POST(request: NextRequest) {

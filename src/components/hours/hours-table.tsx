@@ -16,8 +16,8 @@ import { HoursCard } from './hours-card';
 
 interface HoursTableProps {
   data: HourRecord[];
-  onEdit?: (record: HourRecord) => void;
-  onDelete?: (id: number) => void;
+  onEdit: (record: HourRecord) => void;
+  onDelete: (record: HourRecord) => void;
 }
 
 export function HoursTable({ data, onEdit, onDelete }: HoursTableProps) {
@@ -64,7 +64,7 @@ export function HoursTable({ data, onEdit, onDelete }: HoursTableProps) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => onEdit?.(record)}
+                      onClick={() => onEdit(record)}
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
@@ -72,7 +72,7 @@ export function HoursTable({ data, onEdit, onDelete }: HoursTableProps) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => onDelete?.(record.ID)}
+                      onClick={() => onDelete(record)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
