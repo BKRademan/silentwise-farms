@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
+import { useData } from '@/lib/contexts/data-context';
 
 interface FiltersProps {
   onFiltersChange: (filters: {
@@ -21,12 +22,26 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [growers, setGrowers] = React.useState<{ value: string; label: string }[]>([]);
-  const [employees, setEmployees] = React.useState<{ value: string; label: string }[]>([]);
+  const { employees, growers } = useData();
   const [startDate, setStartDate] = React.useState<Date>();
   const [endDate, setEndDate] = React.useState<Date>();
   const [selectedGrowerId, setSelectedGrowerId] = React.useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = React.useState("");
+
+  // Format employees and growers for Combobox
+  const employeeOptions = React.useMemo(() => 
+    employees.map(emp => ({
+      value: emp.ID.toString(),
+      label: emp.Employee || 'Unnamed Employee',
+    }))
+  , [employees]);
+
+  const growerOptions = React.useMemo(() => 
+    growers.map(grower => ({
+      value: grower.ID.toString(),
+      label: grower.GrowerName || 'Unnamed Grower',
+    }))
+  , [growers]);
 
   // Clear all filters on mount
   React.useEffect(() => {
@@ -42,45 +57,6 @@ export function Filters({ onFiltersChange }: FiltersProps) {
     
     // Notify parent of cleared filters
     onFiltersChange({});
-  }, []);
-
-  // Fetch growers and employees on component mount
-  React.useEffect(() => {
-    console.log('🔄 Initializing filters component, fetching options...');
-    
-    const fetchOptions = async () => {
-      try {
-        // First fetch growers
-        console.log('🔄 Fetching growers...');
-        const growersResponse = await fetch('/api/growers');
-        if (!growersResponse.ok) throw new Error('Failed to fetch growers');
-        const growersData = await growersResponse.json();
-        
-        const formattedGrowerOptions = growersData.map((grower: { ID: number; GrowerName: string }) => ({
-          value: grower.ID.toString(),
-          label: grower.GrowerName || 'Unnamed Grower',
-        }));
-        console.log('✅ Successfully fetched growers:', formattedGrowerOptions.length, 'growers');
-        setGrowers(formattedGrowerOptions);
-        
-        // Then fetch employees after growers are fetched
-        console.log('🔄 Fetching employees...');
-        const employeesResponse = await fetch('/api/employees');
-        if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
-        const employeesData = await employeesResponse.json();
-        
-        const formattedEmployeeOptions = employeesData.map((employee: { ID: number; Employee: string }) => ({
-          value: employee.ID.toString(),
-          label: employee.Employee || 'Unnamed Employee',
-        }));
-        console.log('✅ Successfully fetched employees:', formattedEmployeeOptions.length, 'employees');
-        setEmployees(formattedEmployeeOptions);
-      } catch (error) {
-        console.error('❌ Error fetching options:', error);
-      }
-    };
-
-    fetchOptions();
   }, []);
 
   // Update URL and trigger parent callback when filters change
@@ -193,7 +169,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
 
         <div className="col-span-1">
           <Combobox
-            options={growers}
+            options={growerOptions}
             value={selectedGrowerId}
             onValueChange={(value: string) => {
               console.log('👨‍🌾 Grower selected:', value);
@@ -206,7 +182,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
 
         <div className="col-span-1">
           <Combobox
-            options={employees}
+            options={employeeOptions}
             value={selectedEmployeeId}
             onValueChange={(value: string) => {
               console.log('👤 Employee selected:', value);

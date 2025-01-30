@@ -33,8 +33,14 @@ interface ComboboxProps {
 
 export function Combobox({ options, value, onValueChange, placeholder = "Select option..." }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  const [searchQuery, setSearchQuery] = React.useState("")
 
-  const sortedOptions = options.sort((a, b) => a.label.localeCompare(b.label));
+  const filteredOptions = React.useMemo(() => {
+    if (!searchQuery) return options
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [options, searchQuery])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -51,42 +57,47 @@ export function Combobox({ options, value, onValueChange, placeholder = "Select 
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full min-w-[200px] p-0">
-        <Command>
-          <CommandInput
-            placeholder={`Search ${placeholder.toLowerCase()}...`}
-            onValueChange={(searchTerm) => {
-              const filteredOptions = sortedOptions.filter(option =>
-                option.label.toLowerCase().includes(searchTerm.toLowerCase())
-              );
-              // Update the options displayed based on the search term
-            }}
-          />
-          <CommandList>
-            <CommandEmpty>No option found.</CommandEmpty>
-            <CommandGroup>
-              {sortedOptions.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onValueChange(value === option.value ? "" : option.value)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
+      <div className="z-[9999] fixed">
+        <PopoverContent className="w-[200px] p-0" align="start">
+          <div 
+            className="bg-white rounded-md border shadow-md"
+            style={{ pointerEvents: 'auto' }}
+          >
+            <Command shouldFilter={false}>
+              <CommandInput 
+                placeholder={`Search ${placeholder.toLowerCase()}...`} 
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <CommandList className="max-h-[200px] overflow-y-auto">
+                <CommandEmpty>No options found.</CommandEmpty>
+                <CommandGroup className="overflow-y-auto">
+                  {filteredOptions.map((option) => (
+                    <CommandItem
+                      key={option.value}
+                      value={option.label}
+                      onSelect={() => {
+                        onValueChange(option.value)
+                        setOpen(false)
+                        setSearchQuery("")
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === option.value ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {option.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </div>
+        </PopoverContent>
+      </div>
     </Popover>
   )
 }

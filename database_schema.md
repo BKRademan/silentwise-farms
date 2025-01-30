@@ -15,6 +15,23 @@ Transport transaction table that stores transportation data.
 | Driver | nvarchar(50) | Yes | Driver name |
 | Comment | nvarchar(max) | Yes | Additional comments |
 
+### dbo.THours
+Hours tracking table that stores employee work hours.
+
+| Column Name      | Data Type       | Constraints   | Description                                    |
+|-----------------|-----------------|---------------|------------------------------------------------|
+| ID              | int             | PK, not null  | Primary Key (unique identifier)               |
+| Work_Date       | datetime        | null          | Date of the work entry                        |
+| Hours_Worked    | float           | null          | Number of hours worked                        |
+| Employee_ID_FK  | int             | null          | Foreign Key referencing TEmployee_Details ID  |
+| Grower_ID       | int             | null          | Foreign Key referencing TGrowers ID           |
+| PHoliday        | float           | null          | Public holiday hours                          |
+| Emp_Rate        | float           | null          | Employee's rate of pay                        |
+| Con_Tot         | float           | null          | Total contribution                            |
+| Man_Fee         | float           | null          | Management fee                                |
+| Sick_Leave      | float           | null          | Sick leave hours                              |
+
+
 ### dbo.TPPE_Items
 PPE (Personal Protective Equipment) items reference table.
 

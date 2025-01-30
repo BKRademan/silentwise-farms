@@ -2,10 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, Truck, HardHat, Calendar } from "lucide-react";
+import { Clock, Truck, HardHat, Calendar, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { startOfDay, endOfDay, format, lastDayOfMonth, subMonths, setDay, addWeeks, isBefore } from "date-fns";
+import { useData } from '@/lib/contexts/data-context';
 
 interface DashboardStats {
   hours: {
@@ -63,6 +64,7 @@ function getLastMonday(date: Date): Date {
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
+  const { refreshData } = useData();
   const [stats, setStats] = useState<DashboardStats>({
     hours: {
       periodStart: new Date(),
@@ -73,95 +75,77 @@ export default function Home() {
     ppe: { totalItems: 0, lowStockItems: 0 }
   });
 
+  const fetchDashboardStats = async () => {
+    setIsLoading(true);
+    try {
+      const today = new Date();
+      const lastMonth = subMonths(today, 1);
+      const periodStart = getLastTuesday(lastMonth);
+      const periodEnd = getLastMonday(today);
+      
+      console.log('📅 Fetching hours for period:', {
+        periodStart: format(periodStart, 'yyyy-MM-dd'),
+        periodEnd: format(periodEnd, 'yyyy-MM-dd')
+      });
+      
+      // Fetch hours data for the period
+      const hoursResponse = await fetch(
+        `/api/hours?startDate=${format(periodStart, 'yyyy-MM-dd')}&endDate=${format(periodEnd, 'yyyy-MM-dd')}`
+      );
+      const hoursData = await hoursResponse.json();
+      
+      // Process hours data to get grower summary
+      const growerMap = new Map<string, Set<string>>();
+      
+      hoursData.data?.forEach((record: any) => {
+        if (!record.GrowerName) return;
+        if (!growerMap.has(record.GrowerName)) {
+          growerMap.set(record.GrowerName, new Set<string>());
+        }
+        if (record.Employee) {
+          growerMap.get(record.GrowerName)?.add(record.Employee);
+        }
+      });
+
+      const growerSummary = Array.from(growerMap.entries()).map(([growerName, employees]) => ({
+        growerName,
+        uniqueEmployees: employees.size
+      })).sort((a, b) => b.uniqueEmployees - a.uniqueEmployees);
+
+      // Fetch other data...
+      const transportResponse = await fetch(
+        `/api/transport?startDate=${startOfDay(today).toISOString()}&endDate=${endOfDay(today).toISOString()}`
+      );
+      const transportData = await transportResponse.json();
+      
+      const ppeResponse = await fetch('/api/ppe');
+      const ppeData = await ppeResponse.json();
+      
+      const totalDistance = transportData.data?.reduce((acc: number, curr: any) => acc + (curr.KM || 0), 0) || 0;
+
+      setStats({
+        hours: {
+          periodStart,
+          periodEnd,
+          growerSummary
+        },
+        transport: {
+          todayTrips: transportData.data?.length || 0,
+          totalDistance
+        },
+        ppe: {
+          totalItems: ppeData.data?.length || 0,
+          lowStockItems: ppeData.data?.filter((item: any) => item.PPE_Item_Value < 10).length || 0
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      setIsLoading(true);
-      try {
-        const today = new Date();
-        const lastMonth = subMonths(today, 1);
-        const periodStart = getLastTuesday(lastMonth);
-        const periodEnd = getLastMonday(today);
-        
-        console.log('📅 Fetching hours for period:', {
-          periodStart: format(periodStart, 'yyyy-MM-dd'),
-          periodEnd: format(periodEnd, 'yyyy-MM-dd')
-        });
-        
-        // Fetch hours data for the period
-        const hoursResponse = await fetch(
-          `/api/hours?startDate=${format(periodStart, 'yyyy-MM-dd')}&endDate=${format(periodEnd, 'yyyy-MM-dd')}`
-        );
-        const hoursData = await hoursResponse.json();
-        
-        console.log('📊 Hours API response:', {
-          success: hoursData.success,
-          recordCount: hoursData.data?.length || 0,
-          firstRecord: hoursData.data?.[0],
-          lastRecord: hoursData.data?.[hoursData.data?.length - 1]
-        });
-        
-        // Process hours data to get grower summary
-        const growerMap = new Map<string, Set<string>>();
-        
-        hoursData.data?.forEach((record: any) => {
-          if (!record.GrowerName) {
-            console.log('⚠️ Record missing GrowerName:', record);
-            return;
-          }
-          
-          if (!growerMap.has(record.GrowerName)) {
-            growerMap.set(record.GrowerName, new Set<string>());
-          }
-          if (record.Employee) {
-            growerMap.get(record.GrowerName)?.add(record.Employee);
-          } else {
-            console.log('⚠️ Record missing Employee:', record);
-          }
-        });
-        
-        const growerSummary = Array.from(growerMap.entries()).map(([growerName, employees]) => ({
-          growerName,
-          uniqueEmployees: employees.size
-        })).sort((a, b) => b.uniqueEmployees - a.uniqueEmployees);
-
-        console.log('📈 Processed grower summary:', {
-          totalGrowers: growerSummary.length,
-          summary: growerSummary
-        });
-
-        // Fetch other data...
-        const transportResponse = await fetch(
-          `/api/transport?startDate=${startOfDay(today).toISOString()}&endDate=${endOfDay(today).toISOString()}`
-        );
-        const transportData = await transportResponse.json();
-        
-        const ppeResponse = await fetch('/api/ppe');
-        const ppeData = await ppeResponse.json();
-        
-        const totalDistance = transportData.data?.reduce((acc: number, curr: any) => acc + (curr.KM || 0), 0) || 0;
-
-        setStats({
-          hours: {
-            periodStart,
-            periodEnd,
-            growerSummary
-          },
-          transport: {
-            todayTrips: transportData.data?.length || 0,
-            totalDistance
-          },
-          ppe: {
-            totalItems: ppeData.data?.length || 0,
-            lowStockItems: ppeData.data?.filter((item: any) => item.PPE_Item_Value < 10).length || 0
-          }
-        });
-      } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchDashboardStats();
   }, []);
 
@@ -178,6 +162,31 @@ export default function Home() {
             <span className="text-primary"> Admin</span>
           </h1>
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={async () => {
+            try {
+              console.log('🔄 Starting data refresh...');
+              
+              console.log('1️⃣ Refreshing employees and growers data...');
+              await refreshData();
+              console.log('✅ Successfully refreshed employees and growers data');
+              
+              console.log('2️⃣ Refreshing dashboard stats...');
+              await fetchDashboardStats();
+              console.log('✅ Successfully refreshed dashboard stats');
+              
+              console.log('🎉 Refresh complete!');
+            } catch (error) {
+              console.error('❌ Error during refresh:', error);
+            }
+          }}
+          disabled={isLoading}
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Data
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -37,8 +38,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useToast } from "@/components/ui/use-toast";
+import { Combobox } from "@/components/ui/combobox";
+import { useData } from '@/lib/contexts/data-context';
 
 // Type definitions for form data
 interface Employee {
@@ -49,6 +53,7 @@ interface Employee {
 interface Grower {
   ID: number;
   GrowerName: string;
+  HrsPerDay: number | null;
 }
 
 interface HourFormDialogProps {
@@ -63,16 +68,22 @@ interface HourFormDialogProps {
 const formSchema = z.object({
   Work_Date: z.date({
     required_error: "A date is required",
-  }),
-  Hours_Worked: z.number().min(0).max(24),
-  Employee_ID_FK: z.number(),
-  Grower_ID: z.number(),
-  Overtime: z.number().min(0).max(24).optional(),
-  PHoliday: z.number().min(0).max(24).optional(),
-  Sick_Leave: z.number().min(0).max(24).optional(),
-  Emp_Rate: z.number().optional(),
-  Con_Tot: z.number().optional(),
-  Man_Fee: z.number().optional(),
+  }).nullable(),
+  Hours_Worked: z.number({
+    required_error: "Hours worked is required",
+  }).min(0, "Hours must be 0 or greater").max(24, "Hours cannot exceed 24"),
+  Employee_ID_FK: z.number({
+    required_error: "An employee must be selected",
+  }).min(1, "Please select an employee"),
+  Grower_ID: z.number({
+    required_error: "A grower must be selected",
+  }).min(1, "Please select a grower"),
+  Overtime: z.number().min(0).max(24).nullable().optional(),
+  PHoliday: z.number().min(0).max(24).nullable().optional(),
+  Sick_Leave: z.number().min(0).max(24).nullable().optional(),
+  Emp_Rate: z.number().nullable().optional(),
+  Con_Tot: z.number().nullable().optional(),
+  Man_Fee: z.number().nullable().optional(),
 });
 
 // Type inference from schema
@@ -84,10 +95,9 @@ interface NumberFieldProps extends ControllerRenderProps<FormData, "Hours_Worked
 interface SelectFieldProps extends ControllerRenderProps<FormData, "Employee_ID_FK" | "Grower_ID"> {}
 
 export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: HourFormDialogProps) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [growers, setGrowers] = useState<Grower[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { employees, growers, isLoading: isLoadingData, error } = useData();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Default values for new records
   const defaultValues = {
@@ -97,10 +107,7 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
     Grower_ID: 0,
     Overtime: 0,
     PHoliday: 0,
-    Sick_Leave: 0,
-    Emp_Rate: 0,
-    Con_Tot: 0,
-    Man_Fee: 0,
+    Sick_Leave: 0
   };
 
   // Initialize form with react-hook-form and zod validation
@@ -113,10 +120,7 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
       Grower_ID: initialData.Grower_ID ?? 0,
       Overtime: initialData.Overtime ?? 0,
       PHoliday: initialData.PHoliday ?? 0,
-      Sick_Leave: initialData.Sick_Leave ?? 0,
-      Emp_Rate: initialData.Emp_Rate ?? 0,
-      Con_Tot: initialData.Con_Tot ?? 0,
-      Man_Fee: initialData.Man_Fee ?? 0,
+      Sick_Leave: initialData.Sick_Leave ?? 0
     } : defaultValues,
   });
 
@@ -131,10 +135,7 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
           Grower_ID: initialData.Grower_ID ?? 0,
           Overtime: initialData.Overtime ?? 0,
           PHoliday: initialData.PHoliday ?? 0,
-          Sick_Leave: initialData.Sick_Leave ?? 0,
-          Emp_Rate: initialData.Emp_Rate ?? 0,
-          Con_Tot: initialData.Con_Tot ?? 0,
-          Man_Fee: initialData.Man_Fee ?? 0,
+          Sick_Leave: initialData.Sick_Leave ?? 0
         });
       } else {
         form.reset(defaultValues);
@@ -142,35 +143,28 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
     }
   }, [open, mode, initialData, form]);
 
-  // Fetch employees and growers data when dialog opens
+  // Update Hours_Worked when Grower is selected
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        // Fetch employees data
-        const employeesResponse = await fetch('/api/employees');
-        if (!employeesResponse.ok) throw new Error('Failed to fetch employees');
-        const employeesData = await employeesResponse.json();
-        setEmployees(employeesData || []);
-
-        // Fetch growers data
-        const growersResponse = await fetch('/api/growers');
-        if (!growersResponse.ok) throw new Error('Failed to fetch growers');
-        const growersData = await growersResponse.json();
-        setGrowers(growersData || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        console.error('Error fetching data:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (open) {
-      fetchData();
+    const selectedGrower = growers.find(g => g.ID === form.getValues('Grower_ID'));
+    if (selectedGrower && selectedGrower.HrsPerDay !== null) {
+      form.setValue('Hours_Worked', selectedGrower.HrsPerDay);
     }
-  }, [open]);
+  }, [form.watch('Grower_ID'), growers, form]);
+
+  // Format employees and growers for Combobox
+  const employeeOptions = useMemo(() => 
+    employees.map(emp => ({
+      value: emp.ID.toString(),
+      label: emp.Employee || 'Unnamed Employee',
+    }))
+  , [employees]);
+
+  const growerOptions = useMemo(() => 
+    growers.map(grower => ({
+      value: grower.ID.toString(),
+      label: grower.GrowerName || 'Unnamed Grower',
+    }))
+  , [growers]);
 
   // Handle dialog close
   const handleClose = () => {
@@ -183,6 +177,8 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   // Handle form submission
   async function onSubmit(values: FormData) {
     try {
+      setIsSubmitting(true);
+      console.log('Submitting form with values:', values);
       const endpoint = '/api/hours';
       const method = mode === 'create' ? 'POST' : 'PUT';
       const body = mode === 'edit' ? { ...values, id: initialData?.ID } : values;
@@ -195,16 +191,30 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) throw new Error('Failed to save hour record');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save hour record: ${errorText}`);
+      }
+
+      console.log('Successfully saved hour record');
+      toast({
+        title: "Success",
+        description: `Successfully ${mode === 'create' ? 'created' : 'updated'} hour record`,
+      });
 
       if (onSuccess) {
         onSuccess();
       }
       handleClose();
-      // TODO: Add success toast notification
     } catch (error) {
       console.error('Error saving hour record:', error);
-      // TODO: Add error toast notification
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to save hour record',
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -226,17 +236,20 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   // Main form render
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px] overflow-visible">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? 'Add New Hours Record' : 'Edit Hours Record'}
           </DialogTitle>
+          <DialogDescription>
+            Add a new hours record for an employee.
+          </DialogDescription>
         </DialogHeader>
-        {isLoading ? (
+        {isLoadingData ? (
           <LoadingSpinner />
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-visible">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               {/* Date picker field */}
               <FormField
                 control={form.control}
@@ -276,39 +289,13 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                             >
                               <Calendar
                                 mode="single"
-                                selected={field.value}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    field.onChange(date);
-                                  }
-                                }}
+                                selected={field.value || undefined}
+                                onSelect={field.onChange}
                                 disabled={(date) =>
                                   date > new Date() || date < new Date("1900-01-01")
                                 }
                                 initialFocus
                                 className="rounded-md"
-                                classNames={{
-                                  months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                                  month: "space-y-4",
-                                  caption: "flex justify-center pt-1 relative items-center",
-                                  caption_label: "text-sm font-medium",
-                                  nav: "space-x-1 flex items-center",
-                                  nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 cursor-pointer",
-                                  nav_button_previous: "absolute left-1",
-                                  nav_button_next: "absolute right-1",
-                                  table: "w-full border-collapse space-y-1",
-                                  head_row: "flex",
-                                  head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[0.8rem]",
-                                  row: "flex w-full mt-2",
-                                  cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                                  day: "h-8 w-8 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground cursor-pointer",
-                                  day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-                                  day_today: "bg-accent text-accent-foreground",
-                                  day_outside: "text-muted-foreground opacity-50",
-                                  day_disabled: "text-muted-foreground opacity-50",
-                                  day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                                  day_hidden: "invisible",
-                                }}
                               />
                             </div>
                           </PopoverContent>
@@ -326,28 +313,20 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                 name="Employee_ID_FK"
                 render={({ field }: { field: SelectFieldProps }) => (
                   <FormItem>
-                    <FormLabel>Employee</FormLabel>
-                    <Select 
-                      onValueChange={(value: string) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an employee" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {employees?.map((employee) => (
-                          <SelectItem 
-                            key={employee.ID} 
-                            value={employee.ID.toString()}
-                          >
-                            {employee.Employee}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Employee *</FormLabel>
+                    <FormControl>
+                      <div className="[&_[cmdk-group]]:px-0">
+                        <Combobox
+                          options={employeeOptions}
+                          value={field.value?.toString()}
+                          onValueChange={(value: string) => {
+                            console.log('👤 Employee selected:', value);
+                            field.onChange(parseInt(value));
+                          }}
+                          placeholder="Select Employee"
+                        />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -359,28 +338,20 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                 name="Grower_ID"
                 render={({ field }: { field: SelectFieldProps }) => (
                   <FormItem>
-                    <FormLabel>Grower</FormLabel>
-                    <Select 
-                      onValueChange={(value: string) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a grower" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {growers?.map((grower) => (
-                          <SelectItem 
-                            key={grower.ID} 
-                            value={grower.ID.toString()}
-                          >
-                            {grower.GrowerName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Grower *</FormLabel>
+                    <FormControl>
+                      <div className="[&_[cmdk-group]]:px-0">
+                        <Combobox
+                          options={growerOptions}
+                          value={field.value?.toString()}
+                          onValueChange={(value: string) => {
+                            console.log('👨‍🌾 Grower selected:', value);
+                            field.onChange(parseInt(value));
+                          }}
+                          placeholder="Select Grower"
+                        />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -392,7 +363,7 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                 name="Hours_Worked"
                 render={({ field }: { field: NumberFieldProps }) => (
                   <FormItem>
-                    <FormLabel>Hours</FormLabel>
+                    <FormLabel>Hours *</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -487,8 +458,15 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                 <Button variant="outline" type="button" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button type="submit">
-                  {mode === 'create' ? 'Add Record' : 'Save Changes'}
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <LoadingSpinner className="mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    mode === 'create' ? 'Add Record' : 'Save Changes'
+                  )}
                 </Button>
               </div>
             </form>
