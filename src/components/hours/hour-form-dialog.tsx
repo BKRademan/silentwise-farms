@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { Combobox } from "@/components/ui/combobox";
@@ -61,7 +61,7 @@ interface HourFormDialogProps {
   onClose: () => void;
   initialData?: any;
   mode: 'create' | 'edit';
-  onSuccess?: () => void; // Add callback for successful operations
+  onSuccess?: () => void;
 }
 
 // Zod schema for form validation
@@ -98,17 +98,23 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   const { toast } = useToast();
   const { employees, growers, isLoading: isLoadingData, error } = useData();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastUsedValues, setLastUsedValues] = useState<{
+    Work_Date: Date;
+    Grower_ID: number;
+    Hours_Worked: number;
+  } | null>(null);
+  const [isQuickMode, setIsQuickMode] = useState(false);
 
   // Default values for new records
-  const defaultValues = {
-    Work_Date: new Date(),
-    Hours_Worked: 0,
+  const defaultValues = useMemo(() => ({
+    Work_Date: lastUsedValues?.Work_Date || new Date(),
+    Hours_Worked: lastUsedValues?.Hours_Worked || 0,
     Employee_ID_FK: 0,
-    Grower_ID: 0,
+    Grower_ID: lastUsedValues?.Grower_ID || 0,
     Overtime: 0,
     PHoliday: 0,
     Sick_Leave: 0
-  };
+  }), [lastUsedValues]);
 
   // Initialize form with react-hook-form and zod validation
   const form = useForm<FormData>({
@@ -124,32 +130,51 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
     } : defaultValues,
   });
 
-  // Reset form when dialog opens/closes
+  // Reset form when dialog opens/closes or when defaultValues change
   useEffect(() => {
-    if (open) {
-      if (mode === 'edit' && initialData) {
-        form.reset({
-          Work_Date: initialData.Work_Date ? new Date(initialData.Work_Date) : new Date(),
-          Hours_Worked: initialData.Hours_Worked ?? 0,
-          Employee_ID_FK: initialData.Employee_ID_FK ?? 0,
-          Grower_ID: initialData.Grower_ID ?? 0,
-          Overtime: initialData.Overtime ?? 0,
-          PHoliday: initialData.PHoliday ?? 0,
-          Sick_Leave: initialData.Sick_Leave ?? 0
-        });
-      } else {
-        form.reset(defaultValues);
-      }
+    if (!open) return;
+    
+    if (mode === 'edit' && initialData) {
+      form.reset({
+        Work_Date: initialData.Work_Date ? new Date(initialData.Work_Date) : new Date(),
+        Hours_Worked: initialData.Hours_Worked ?? 0,
+        Employee_ID_FK: initialData.Employee_ID_FK ?? 0,
+        Grower_ID: initialData.Grower_ID ?? 0,
+        Overtime: initialData.Overtime ?? 0,
+        PHoliday: initialData.PHoliday ?? 0,
+        Sick_Leave: initialData.Sick_Leave ?? 0
+      });
+    } else {
+      // For new records, reset everything
+      form.reset({
+        Work_Date: new Date(),
+        Hours_Worked: 0,
+        Employee_ID_FK: 0,
+        Grower_ID: 0,
+        Overtime: 0,
+        PHoliday: 0,
+        Sick_Leave: 0
+      });
+      setLastUsedValues(null);
     }
+    // Always start in normal mode when opening the dialog
+    setIsQuickMode(false);
   }, [open, mode, initialData, form]);
 
   // Update Hours_Worked when Grower is selected
-  useEffect(() => {
-    const selectedGrower = growers.find(g => g.ID === form.getValues('Grower_ID'));
-    if (selectedGrower && selectedGrower.HrsPerDay !== null) {
+  const updateHoursWorked = useCallback((growerId: number) => {
+    const selectedGrower = growers.find(g => g.ID === growerId);
+    if (selectedGrower?.HrsPerDay != null) {
       form.setValue('Hours_Worked', selectedGrower.HrsPerDay);
     }
-  }, [form.watch('Grower_ID'), growers, form]);
+  }, [growers, form]);
+
+  useEffect(() => {
+    const growerId = form.getValues('Grower_ID');
+    if (growerId) {
+      updateHoursWorked(growerId);
+    }
+  }, [form.watch('Grower_ID'), updateHoursWorked]);
 
   // Format employees and growers for Combobox
   const employeeOptions = useMemo(() => 
@@ -175,10 +200,9 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   };
 
   // Handle form submission
-  async function onSubmit(values: FormData) {
+  async function onSubmit(values: FormData, action: 'save' | 'save_and_new' = 'save') {
     try {
       setIsSubmitting(true);
-      console.log('Submitting form with values:', values);
       const endpoint = '/api/hours';
       const method = mode === 'create' ? 'POST' : 'PUT';
       const body = mode === 'edit' ? { ...values, id: initialData?.ID } : values;
@@ -202,10 +226,34 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
         description: `Successfully ${mode === 'create' ? 'created' : 'updated'} hour record`,
       });
 
+      // Store last used values for quick mode
+      if (mode === 'create') {
+        setLastUsedValues({
+          Work_Date: values.Work_Date || new Date(),
+          Grower_ID: values.Grower_ID,
+          Hours_Worked: values.Hours_Worked
+        });
+      }
+
       if (onSuccess) {
         onSuccess();
       }
-      handleClose();
+
+      if (action === 'save_and_new') {
+        // Reset only the employee field, keeping other values
+        form.reset({
+          ...values,
+          Employee_ID_FK: 0,
+          Hours_Worked: values.Hours_Worked // Explicitly keep the Hours_Worked value
+        });
+        // Focus the employee field
+        const employeeInput = document.querySelector('[name="Employee_ID_FK"]');
+        if (employeeInput) {
+          (employeeInput as HTMLElement).focus();
+        }
+      } else {
+        handleClose();
+      }
     } catch (error) {
       console.error('Error saving hour record:', error);
       toast({
@@ -242,70 +290,105 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
             {mode === 'create' ? 'Add New Hours Record' : 'Edit Hours Record'}
           </DialogTitle>
           <DialogDescription>
-            Add a new hours record for an employee.
+            {mode === 'create' ? (
+              <div className="flex items-center justify-between">
+                <span>Add a new hours record for an employee.</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsQuickMode(!isQuickMode)}
+                  className="ml-2"
+                >
+                  {isQuickMode ? 'Normal Mode' : 'Quick Mode'}
+                </Button>
+              </div>
+            ) : (
+              'Edit hours record for an employee.'
+            )}
           </DialogDescription>
         </DialogHeader>
         {isLoadingData ? (
           <LoadingSpinner />
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Date picker field */}
-              <FormField
-                control={form.control}
-                name="Work_Date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <div className="grid gap-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              type="button"
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <div className="z-[9999] fixed">
-                          <PopoverContent 
-                            className="w-auto p-0" 
-                            align="start"
-                          >
-                            <div 
-                              className="bg-white rounded-md border shadow-md"
-                              style={{ pointerEvents: 'auto' }}
-                            >
-                              <Calendar
-                                mode="single"
-                                selected={field.value || undefined}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date("1900-01-01")
-                                }
-                                initialFocus
-                                className="rounded-md"
-                              />
-                            </div>
-                          </PopoverContent>
+            <form onSubmit={form.handleSubmit((data) => onSubmit(data, 'save'))} className="space-y-4">
+              {/* Date picker field - Only show in normal mode or edit mode */}
+              {(!isQuickMode || mode === 'edit') && (
+                <FormField
+                  control={form.control}
+                  name="Work_Date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Date</FormLabel>
+                      <div className="grid gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                                type="button"
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <div className="z-[9999] fixed">
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <div className="bg-white rounded-md border shadow-md" style={{ pointerEvents: 'auto' }}>
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value || undefined}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date > new Date() || date < new Date("1900-01-01")
+                                  }
+                                  initialFocus
+                                  className="rounded-md"
+                                />
+                              </div>
+                            </PopoverContent>
+                          </div>
+                        </Popover>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Grower select field - Only show in normal mode or edit mode */}
+              {(!isQuickMode || mode === 'edit') && (
+                <FormField
+                  control={form.control}
+                  name="Grower_ID"
+                  render={({ field }: { field: SelectFieldProps }) => (
+                    <FormItem>
+                      <FormLabel>Grower *</FormLabel>
+                      <FormControl>
+                        <div className="[&_[cmdk-group]]:px-0">
+                          <Combobox
+                            options={growerOptions}
+                            value={field.value?.toString()}
+                            onValueChange={(value: string) => {
+                              field.onChange(parseInt(value));
+                            }}
+                          />
                         </div>
-                      </Popover>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Employee select field */}
               <FormField
@@ -320,10 +403,8 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                           options={employeeOptions}
                           value={field.value?.toString()}
                           onValueChange={(value: string) => {
-                            console.log('👤 Employee selected:', value);
                             field.onChange(parseInt(value));
                           }}
-                          placeholder="Select Employee"
                         />
                       </div>
                     </FormControl>
@@ -332,132 +413,127 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
                 )}
               />
 
-              {/* Grower select field */}
-              <FormField
-                control={form.control}
-                name="Grower_ID"
-                render={({ field }: { field: SelectFieldProps }) => (
-                  <FormItem>
-                    <FormLabel>Grower *</FormLabel>
-                    <FormControl>
-                      <div className="[&_[cmdk-group]]:px-0">
-                        <Combobox
-                          options={growerOptions}
+              {/* Hours worked input field - Only show in normal mode or edit mode */}
+              {(!isQuickMode || mode === 'edit') && (
+                <FormField
+                  control={form.control}
+                  name="Hours_Worked"
+                  render={({ field }: { field: NumberFieldProps }) => (
+                    <FormItem>
+                      <FormLabel>Hours *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
                           value={field.value?.toString()}
-                          onValueChange={(value: string) => {
-                            console.log('👨‍🌾 Grower selected:', value);
-                            field.onChange(parseInt(value));
-                          }}
-                          placeholder="Select Grower"
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                            field.onChange(parseFloat(e.target.value))
+                          }
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
                         />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
-              {/* Hours worked input field */}
-              <FormField
-                control={form.control}
-                name="Hours_Worked"
-                render={({ field }: { field: NumberFieldProps }) => (
-                  <FormItem>
-                    <FormLabel>Hours *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        value={field.value?.toString()}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Other fields - Only show in normal mode or edit mode */}
+              {(!isQuickMode || mode === 'edit') && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="Overtime"
+                    render={({ field }: { field: NumberFieldProps }) => (
+                      <FormItem>
+                        <FormLabel>Overtime</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            value={field.value?.toString()}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                              field.onChange(parseFloat(e.target.value))
+                            }
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {/* Overtime input field */}
-              <FormField
-                control={form.control}
-                name="Overtime"
-                render={({ field }: { field: NumberFieldProps }) => (
-                  <FormItem>
-                    <FormLabel>Overtime</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        value={field.value?.toString()}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="PHoliday"
+                    render={({ field }: { field: NumberFieldProps }) => (
+                      <FormItem>
+                        <FormLabel>Public Holiday</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            value={field.value?.toString()}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                              field.onChange(parseFloat(e.target.value))
+                            }
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {/* Public Holiday input field */}
-              <FormField
-                control={form.control}
-                name="PHoliday"
-                render={({ field }: { field: NumberFieldProps }) => (
-                  <FormItem>
-                    <FormLabel>Public Holiday</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        value={field.value?.toString()}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Sick Leave input field */}
-              <FormField
-                control={form.control}
-                name="Sick_Leave"
-                render={({ field }: { field: NumberFieldProps }) => (
-                  <FormItem>
-                    <FormLabel>Sick Leave</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        value={field.value?.toString()}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="Sick_Leave"
+                    render={({ field }: { field: NumberFieldProps }) => (
+                      <FormItem>
+                        <FormLabel>Sick Leave</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            value={field.value?.toString()}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
+                              field.onChange(parseFloat(e.target.value))
+                            }
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
 
               {/* Form action buttons */}
               <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="outline" type="button" onClick={handleClose}>
                   Cancel
                 </Button>
+                {mode === 'create' && isQuickMode && (
+                  <Button 
+                    type="button" 
+                    disabled={isSubmitting}
+                    onClick={() => form.handleSubmit((data) => onSubmit(data, 'save_and_new'))()}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <LoadingSpinner className="mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save & Add Another'
+                    )}
+                  </Button>
+                )}
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
