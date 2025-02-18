@@ -203,9 +203,20 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   async function onSubmit(values: FormData, action: 'save' | 'save_and_new' = 'save') {
     try {
       setIsSubmitting(true);
+      
+      // Convert the Work_Date to UTC midnight to prevent timezone issues
+      const utcDate = new Date(Date.UTC(
+        values.Work_Date!.getFullYear(),
+        values.Work_Date!.getMonth(),
+        values.Work_Date!.getDate()
+      ));
+
+      const body = mode === 'edit' 
+        ? { ...values, id: initialData?.ID, Work_Date: utcDate } 
+        : { ...values, Work_Date: utcDate };
+
       const endpoint = '/api/hours';
       const method = mode === 'create' ? 'POST' : 'PUT';
-      const body = mode === 'edit' ? { ...values, id: initialData?.ID } : values;
 
       const response = await fetch(endpoint, {
         method,
