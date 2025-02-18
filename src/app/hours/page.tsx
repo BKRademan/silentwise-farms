@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { HoursTable } from '@/components/hours/hours-table';
@@ -24,7 +25,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export default function HoursPage() {
+// Client component that uses useSearchParams
+function HoursContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [records, setRecords] = useState<HourRecord[]>([]);
@@ -326,5 +328,13 @@ export default function HoursPage() {
         </AlertDialog>
       </div>
     </div>
+  );
+}
+
+export default function HoursPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <HoursContent />
+    </Suspense>
   );
 } 

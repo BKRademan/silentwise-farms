@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { format, eachDayOfInterval, parseISO, endOfDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,13 +9,15 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface DailyEmployeeCount {
   date: string;
   Employees: number;
 }
 
-export default function HoursAnalyticsPage() {
+// Client component that uses useSearchParams
+function AnalyticsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<DailyEmployeeCount[]>([]);
   const searchParams = useSearchParams();
@@ -172,4 +175,12 @@ export default function HoursAnalyticsPage() {
       </div>
     </main>
   );
-} 
+}
+
+export default function HoursAnalyticsPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <AnalyticsContent />
+    </Suspense>
+  );
+}

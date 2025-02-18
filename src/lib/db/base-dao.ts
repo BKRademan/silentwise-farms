@@ -45,7 +45,8 @@ export class BaseDAO<T> {
 
   async findAll(): Promise<T[]> {
     try {
-      const request = await this.getConnection();
+      const pool = await this.getConnection();
+      const request = pool.request();
       const result: sql.IResult<T> = await request.query(`SELECT * FROM ${this.tableName}`);
       return result.recordset;
     } catch (error) {
@@ -56,9 +57,10 @@ export class BaseDAO<T> {
 
   async findById(id: number): Promise<T | null> {
     try {
-      const request = await this.getConnection();
+      const pool = await this.getConnection();
+      const request = pool.request();
       const result: sql.IResult<T> = await request
-        .input('id', id)
+        .input('id', sql.Int, id)
         .query(`SELECT * FROM ${this.tableName} WHERE ID = @id`);
       return result.recordset[0] || null;
     } catch (error) {
@@ -128,7 +130,8 @@ export class BaseDAO<T> {
     params?: { [key: string]: any }
   ): Promise<R[]> {
     try {
-      const request = await this.getConnection();
+      const pool = await this.getConnection();
+      const request = pool.request();
 
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
