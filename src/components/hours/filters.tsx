@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
 import { useData } from '@/lib/contexts/data-context';
+import { useCallback } from 'react';
 
 interface FiltersProps {
   onFiltersChange: (filters: {
@@ -60,47 +61,46 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   }, []);
 
   // Update URL and trigger parent callback when filters change
-  const updateFilters = React.useCallback(
-    (updates: Record<string, string | undefined>) => {
-      console.log('🔄 Updating filters:', updates);
-      const params = new URLSearchParams(searchParams);
-      
-      // First, get all current params
-      const currentParams = Array.from(params.entries()).reduce((acc, [key]) => {
-        acc.add(key);
-        return acc;
-      }, new Set<string>());
+  const updateFilters = useCallback((newFilters: { 
+    startDate?: string; 
+    endDate?: string; 
+    growerId?: string; 
+    employeeId?: string; 
+  }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    // Convert dates to UTC start/end of day
+    if (newFilters.startDate) {
+      const start = new Date(newFilters.startDate);
+      const utcStart = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
+      params.set('startDate', utcStart.toISOString());
+    }
+    
+    if (newFilters.endDate) {
+      const end = new Date(newFilters.endDate);
+      const utcEnd = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate() + 1));
+      params.set('endDate', utcEnd.toISOString());
+    }
+    
+    // ... existing filter updates ...
+    
+    router.push(`${pathname}?${params.toString()}`);
+  }, [searchParams, router, pathname]);
 
-      // Remove any params that are being updated
-      Object.keys(updates).forEach(key => {
-        if (currentParams.has(key)) {
-          params.delete(key);
-        }
-      });
-
-      // Only add params that have actual values
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value && value.trim() !== '') {
-          params.set(key, value);
-        }
-      });
-
-      const newUrl = `${pathname}?${params.toString()}`;
-      console.log('🔄 Updating URL to:', newUrl);
-      
-      // Only include non-empty values in the filters
-      const cleanUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-        if (value && value.trim() !== '') {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as Record<string, string>);
-
-      router.push(newUrl);
-      onFiltersChange(cleanUpdates);
-    },
-    [pathname, router, searchParams, onFiltersChange]
-  );
+  // In date selection handlers:
+  function handleDateSelect(date: Date | undefined) {
+    if (!date) return;
+    
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    
+    updateFilters({
+      startDate: start.toISOString(),
+      endDate: end.toISOString()
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2 sm:gap-4 w-full">
@@ -126,9 +126,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 onSelect={(date) => {
                   console.log('📅 Start date selected:', date);
                   setStartDate(date);
-                  updateFilters({
-                    startDate: date ? format(date, 'yyyy-MM-dd') : undefined,
-                  });
+                  handleDateSelect(date);
                 }}
                 initialFocus
               />
@@ -157,9 +155,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 onSelect={(date) => {
                   console.log('📅 End date selected:', date);
                   setEndDate(date);
-                  updateFilters({
-                    endDate: date ? format(date, 'yyyy-MM-dd') : undefined,
-                  });
+                  handleDateSelect(date);
                 }}
                 initialFocus
               />

@@ -25,19 +25,18 @@ export class HoursDAO extends BaseDAO<HourRecord> {
     return formatted;
   }
 
-  async getHoursByDateRange(startDate: Date, endDate: Date): Promise<HourRecord[]> {
-    console.log('Getting hours by date range:', { startDate, endDate });
+  async getHoursByDateRange(start: Date, end: Date): Promise<HourRecord[]> {
+    console.log('Querying hours between:', { start, end });
     try {
       const result = await this.executeQuery<HourRecord>(
         `SELECT * FROM ${this.tableName} 
-         WHERE Work_Date >= @startDate AND Work_Date < @endDate
+         WHERE Work_Date >= @start AND Work_Date < @end
          ORDER BY Work_Date DESC`,
         { 
-          startDate: this.formatSQLDate(startDate),
-          endDate: this.formatSQLDate(endDate)
+          start: start.toISOString(),
+          end: end.toISOString()
         }
       );
-      console.log(`Found ${result.length} records in date range`);
       return result;
     } catch (error) {
       console.error('Error in getHoursByDateRange:', error);

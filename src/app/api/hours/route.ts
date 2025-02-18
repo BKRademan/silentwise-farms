@@ -8,17 +8,17 @@ const hoursDao = new HoursDAO();
 export async function GET(request: NextRequest) {
   return handleApiRoute(async () => {
     const searchParams = request.nextUrl.searchParams;
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const startDateISO = searchParams.get('startDate');
+    const endDateISO = searchParams.get('endDate');
     const employeeId = searchParams.get('employeeId');
     const growerId = searchParams.get('growerId');
 
-    if (!startDate || !endDate) {
+    if (!startDateISO || !endDateISO) {
       throw new ValidationError('Start date and end date are required');
     }
 
-    const start = new Date(`${startDate}T00:00:00.000Z`);
-    const end = new Date(`${endDate}T23:59:59.999Z`);
+    const start = new Date(startDateISO);
+    const end = new Date(endDateISO);
 
     let records: HourRecord[];
 
@@ -44,7 +44,10 @@ export async function GET(request: NextRequest) {
       );
     } else {
       // Just get records by date range
-      records = await hoursDao.getHoursByDateRange(start, end);
+      records = await hoursDao.getHoursByDateRange(
+        start,
+        new Date(end.getTime() - 1)  // Subtract 1ms to make end date inclusive
+      );
     }
 
     return records;
