@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { addDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -44,22 +44,6 @@ export function Filters({ onFiltersChange }: FiltersProps) {
     }))
   , [growers]);
 
-  // Clear all filters on mount
-  React.useEffect(() => {
-    console.log('🧹 Clearing all filters on mount');
-    const params = new URLSearchParams();
-    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
-    
-    // Reset all state
-    setStartDate(undefined);
-    setEndDate(undefined);
-    setSelectedGrowerId("");
-    setSelectedEmployeeId("");
-    
-    // Notify parent of cleared filters
-    onFiltersChange({});
-  }, []);
-
   // Update URL and trigger parent callback when filters change
   const updateFilters = useCallback((newFilters: { 
     startDate?: string; 
@@ -74,18 +58,36 @@ export function Filters({ onFiltersChange }: FiltersProps) {
       const start = new Date(newFilters.startDate);
       const utcStart = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
       params.set('startDate', utcStart.toISOString());
+    } else {
+      params.delete('startDate');
     }
     
     if (newFilters.endDate) {
       const end = new Date(newFilters.endDate);
       const utcEnd = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate() + 1));
       params.set('endDate', utcEnd.toISOString());
+    } else {
+      params.delete('endDate');
     }
     
-    // ... existing filter updates ...
+    // Handle grower and employee IDs
+    if (newFilters.growerId) {
+      params.set('growerId', newFilters.growerId);
+    } else {
+      params.delete('growerId');
+    }
     
-    router.push(`${pathname}?${params.toString()}`);
-  }, [searchParams, router, pathname]);
+    if (newFilters.employeeId) {
+      params.set('employeeId', newFilters.employeeId);
+    } else {
+      params.delete('employeeId');
+    }
+    
+    // Update URL and notify parent
+    const newUrl = `${pathname}?${params.toString()}`;
+    router.push(newUrl);
+    onFiltersChange(newFilters);
+  }, [searchParams, router, pathname, onFiltersChange]);
 
   // In date selection handlers:
   function handleDateSelect(date: Date | undefined) {
@@ -98,7 +100,9 @@ export function Filters({ onFiltersChange }: FiltersProps) {
     
     updateFilters({
       startDate: start.toISOString(),
-      endDate: end.toISOString()
+      endDate: end.toISOString(),
+      growerId: selectedGrowerId || undefined,
+      employeeId: selectedEmployeeId || undefined
     });
   }
 
@@ -124,7 +128,6 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 mode="single"
                 selected={startDate}
                 onSelect={(date) => {
-                  console.log('📅 Start date selected:', date);
                   setStartDate(date);
                   handleDateSelect(date);
                 }}
@@ -153,7 +156,6 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 mode="single"
                 selected={endDate}
                 onSelect={(date) => {
-                  console.log('📅 End date selected:', date);
                   setEndDate(date);
                   handleDateSelect(date);
                 }}
@@ -168,9 +170,13 @@ export function Filters({ onFiltersChange }: FiltersProps) {
             options={growerOptions}
             value={selectedGrowerId}
             onValueChange={(value: string) => {
-              console.log('👨‍🌾 Grower selected:', value);
               setSelectedGrowerId(value);
-              updateFilters({ growerId: value || undefined });
+              updateFilters({
+                startDate: startDate?.toISOString(),
+                endDate: endDate?.toISOString(),
+                growerId: value || undefined,
+                employeeId: selectedEmployeeId || undefined
+              });
             }}
             placeholder="Select Grower"
           />
@@ -181,9 +187,13 @@ export function Filters({ onFiltersChange }: FiltersProps) {
             options={employeeOptions}
             value={selectedEmployeeId}
             onValueChange={(value: string) => {
-              console.log('👤 Employee selected:', value);
               setSelectedEmployeeId(value);
-              updateFilters({ employeeId: value || undefined });
+              updateFilters({
+                startDate: startDate?.toISOString(),
+                endDate: endDate?.toISOString(),
+                growerId: selectedGrowerId || undefined,
+                employeeId: value || undefined
+              });
             }}
             placeholder="Select Employee"
           />
