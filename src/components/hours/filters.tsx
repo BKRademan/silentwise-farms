@@ -33,7 +33,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   const employeeOptions = React.useMemo(() => 
     employees.map(emp => ({
       value: emp.ID.toString(),
-      label: emp.Employee || 'Unnamed Employee',
+      label: emp.EmplNo || 'Unnamed Employee',
     }))
   , [employees]);
 

@@ -57,13 +57,13 @@ Deductions transaction table.
 | Column Name   | Data Type       | Constraints   | Description                      |
 |---------------|-----------------|---------------|----------------------------------|
 | ID            | int             | PK, not null  | Primary Key (unique identifier) |
-| Employee      | nvarchar(255)   | null          | Employee's full name            |
-| Surname       | nvarchar(255)   | null          | Employee's surname              |
-| First name    | nvarchar(255)   | null          | Employee's first name           |
-| Known as      | nvarchar(255)   | null          | Nickname or preferred name      |
+| EmplNo        | nvarchar(255)   | null          | Employee number                 |
+| LastName      | nvarchar(255)   | null          | Employee's last name            |
+| FirstName     | nvarchar(255)   | null          | Employee's first name           |
+| knownAs       | nvarchar(255)   | null          | Nickname or preferred name      |
 | RATE          | float           | null          | Hourly or daily rate of pay     |
 | IDNumber      | nvarchar(50)    | null          | Employee's ID number            |
-| StartDate     | date            | null          | Employee's start date           |
+| DateEngaged   | date            | null          | Employee's start date           |
 
 ### dbo.TGrowers
 | Column Name        | Data Type     | Constraints   | Description                                   |
@@ -77,7 +77,7 @@ Deductions transaction table.
 | ContPerc           | float         | null          | Contribution percentage                      |
 | AnnualLeavePerc    | float         | null          | Annual leave percentage                      |
 | SickLeavePerc      | float         | null          | Sick leave percentage                        |
-| WMCPerc            | float         | null          | Worker’s Medical Contribution percentage     |
+| WMCPerc            | float         | null          | Worker's Medical Contribution percentage     |
 | SDLPerc            | float         | null          | Skills Development Levy percentage           |
 | PPEPerc            | float         | null          | Personal Protective Equipment percentage     |
 | UIFPerc            | float         | null          | Unemployment Insurance Fund percentage       |
@@ -110,7 +110,7 @@ Detailed view of deductions including employee and PPE information.
 | PPE | money | Yes | PPE deduction amount |
 | Date | datetime | Yes | Date of deduction |
 | EmpID | int | Yes | Employee ID |
-| Employee | nvarchar(255) | Yes | Employee name |
+| EmplNo | nvarchar(255) | Yes | Employee number |
 | PPE_ID | int | Yes | PPE item ID |
 | PPE_Item | nvarchar(255) | Yes | PPE item name/description | 
 
@@ -121,7 +121,7 @@ Detailed view of deductions including employee and PPE information.
 | Work_Date        | datetime2(7)    | null          | Date of the work entry                        |
 | Hours_Worked     | float           | null          | Total hours worked                            |
 | Employee_ID_FK   | int             | null          | Foreign Key referencing TEmployee_Details ID  |
-| Employee         | nvarchar(255)   | null          | Employee's name                               |
+| EmplNo           | nvarchar(255)   | null          | Employee number                               |
 | Grower_ID        | int             | null          | Foreign Key referencing TGrowers ID           |
 | GrowerName       | nvarchar(50)    | null          | Name of the grower                            |
 | Overtime         | float           | null          | Overtime hours                                |

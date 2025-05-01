@@ -15,18 +15,18 @@ export async function POST(request: NextRequest) {
   return handleApiRoute(async () => {
     const body = await request.json();
     
-    if (!body.Employee || !body.Surname || !body.FirstName) {
+    if (!body.EmplNo || !body.LastName || !body.FirstName) {
       throw new ValidationError('Missing required fields');
     }
 
     const employee: Omit<Employee, 'ID'> = {
-      Employee: body.Employee,
-      Surname: body.Surname,
+      EmplNo: body.EmplNo,
+      LastName: body.LastName,
       FirstName: body.FirstName,
-      KnownAs: body.KnownAs || null,
+      knownAs: body.knownAs || null,
       RATE: body.RATE || null,
       IDNumber: body.IDNumber || null,
-      StartDate: body.StartDate ? new Date(body.StartDate) : null
+      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : null
     };
 
     return employeeDao.addEmployee(employee);
@@ -42,13 +42,13 @@ export async function PUT(request: NextRequest) {
     }
 
     const updates: Partial<Employee> = {
-      Employee: body.Employee,
-      Surname: body.Surname,
+      EmplNo: body.EmplNo,
+      LastName: body.LastName,
       FirstName: body.FirstName,
-      KnownAs: body.KnownAs,
+      knownAs: body.knownAs,
       RATE: body.RATE,
       IDNumber: body.IDNumber,
-      StartDate: body.StartDate ? new Date(body.StartDate) : undefined
+      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : undefined
     };
 
     await employeeDao.updateEmployee(body.id, updates);

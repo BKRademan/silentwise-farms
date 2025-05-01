@@ -316,8 +316,9 @@ function HoursContent() {
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the hours record
+                Are you sure you want to delete the hours record
                 for {selectedRecord?.Employee} on {selectedRecord?.Work_Date ? new Date(selectedRecord.Work_Date).toLocaleDateString() : ''}.
+                This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

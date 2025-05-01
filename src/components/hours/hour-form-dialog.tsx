@@ -47,7 +47,7 @@ import { useData } from '@/lib/contexts/data-context';
 // Type definitions for form data
 interface Employee {
   ID: number;
-  Employee: string;
+  EmplNo: string;
 }
 
 interface Grower {
@@ -180,7 +180,7 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
   const employeeOptions = useMemo(() => 
     employees.map(emp => ({
       value: emp.ID.toString(),
-      label: emp.Employee || 'Unnamed Employee',
+      label: emp.EmplNo || 'Unnamed Employee',
     }))
   , [employees]);
 

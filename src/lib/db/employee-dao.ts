@@ -11,7 +11,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       console.log('Fetching all employees...');
       const result = await this.executeQuery<Employee>(
         `SELECT * FROM ${this.tableName} 
-         ORDER BY Surname, [First name]`
+         ORDER BY LastName, FirstName`
       );
       console.log(`Found ${result.length} employees`);
       return result;
@@ -26,11 +26,11 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       console.log('Finding employees by name:', name);
       const result = await this.executeQuery<Employee>(
         `SELECT * FROM ${this.tableName} 
-         WHERE Employee LIKE @name 
-         OR Surname LIKE @name 
-         OR [First name] LIKE @name 
-         OR [Known as] LIKE @name
-         ORDER BY Surname, [First name]`,
+         WHERE EmplNo LIKE @name 
+         OR LastName LIKE @name 
+         OR FirstName LIKE @name 
+         OR knownAs LIKE @name
+         ORDER BY LastName, FirstName`,
         { name: `%${name}%` }
       );
       console.log(`Found ${result.length} employees matching name:`, name);
@@ -47,15 +47,15 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       const result = await this.executeQuery<Employee>(
         `SELECT 
           ID,
-          Employee,
-          Surname,
-          [First name] as FirstName,
-          [Known as] as KnownAs,
+          EmplNo,
+          LastName,
+          FirstName,
+          knownAs,
           RATE,
           IDNumber,
-          StartDate
+          DateEngaged
          FROM ${this.tableName} 
-         ORDER BY Surname, [First name]`
+         ORDER BY LastName, FirstName`
       );
       console.log(`Found ${result.length} active employees`);
       return result;
@@ -70,21 +70,21 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       console.log('Adding new employee:', employee);
       const result = await this.executeQuery<Employee>(
         `INSERT INTO ${this.tableName} (
-          Employee, Surname, [First name], [Known as],
-          RATE, IDNumber, StartDate
+          EmplNo, LastName, FirstName, knownAs,
+          RATE, IDNumber, DateEngaged
         ) VALUES (
-          @employee, @surname, @firstName, @knownAs,
-          @rate, @idNumber, @startDate
+          @emplNo, @lastName, @firstName, @knownAs,
+          @rate, @idNumber, @dateEngaged
         );
         SELECT SCOPE_IDENTITY() as ID;`,
         {
-          employee: employee.Employee,
-          surname: employee.Surname,
+          emplNo: employee.EmplNo,
+          lastName: employee.LastName,
           firstName: employee.FirstName,
-          knownAs: employee.KnownAs,
+          knownAs: employee.knownAs,
           rate: employee.RATE,
           idNumber: employee.IDNumber,
-          startDate: employee.StartDate
+          dateEngaged: employee.DateEngaged
         }
       );
 
@@ -105,13 +105,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       console.log('Updating employee:', { id, ...employee });
       const updates = Object.entries(employee)
         .filter(([key]) => key !== 'ID')
-        .map(([key]) => {
-          // Handle special column names with spaces
-          const columnName = key === 'FirstName' ? '[First name]' :
-                           key === 'KnownAs' ? '[Known as]' :
-                           key;
-          return `${columnName} = @${key}`;
-        })
+        .map(([key]) => `${key} = @${key}`)
         .join(', ');
 
       await this.executeQuery(
@@ -142,7 +136,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
          INNER JOIN dbo.THour_Data_View h ON e.ID = h.Employee_ID_FK
          WHERE h.Grower_ID = @growerId 
          AND CAST(h.Work_Date AS DATE) = CAST(@date AS DATE)
-         ORDER BY e.Surname, e.[First name]`,
+         ORDER BY e.LastName, e.FirstName`,
         { growerId, date }
       );
       console.log(`Found ${result.length} employees for grower ${growerId} on date ${date}`);

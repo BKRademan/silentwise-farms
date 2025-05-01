@@ -1,12 +1,12 @@
 export interface Employee {
   ID: number;
-  Employee: string | null;
-  Surname: string | null;
+  EmplNo: string | null;
+  LastName: string | null;
   FirstName: string | null;
-  KnownAs: string | null;
+  knownAs: string | null;
   RATE: number | null;
   IDNumber: string | null;
-  StartDate: Date | null;
+  DateEngaged: Date | null;
 }
 
 export interface Grower {
