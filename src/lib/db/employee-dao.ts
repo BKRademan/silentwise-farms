@@ -1,6 +1,11 @@
 import { BaseDAO } from './base-dao';
 import { Employee } from '@/types/database';
 
+interface EmployeeWithLastWorked extends Employee {
+  lastWorkedDate: Date | null;
+  fullName?: string;
+}
+
 export class EmployeeDAO extends BaseDAO<Employee> {
   constructor() {
     super('dbo.TEmployee_Details');
@@ -143,6 +148,125 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       return result;
     } catch (error) {
       console.error('Error in getEmployeesByGrowerAndDate:', error);
+      throw error;
+    }
+  }
+
+  async findAllWithLastWorkedDate(): Promise<EmployeeWithLastWorked[]> {
+    try {
+      console.log('Fetching all employees with last worked date...');
+      const result = await this.executeQuery<EmployeeWithLastWorked>(
+        `SELECT 
+          e.ID, 
+          e.EmplNo, 
+          ISNULL(e.LastName, '') as LastName, 
+          ISNULL(e.FirstName, '') as FirstName, 
+          ISNULL(e.knownAs, '') as knownAs, 
+          e.RATE, 
+          ISNULL(e.IDNumber, '') as IDNumber, 
+          e.DateEngaged,
+          ISNULL(e.BankName, '') as BankName,
+          ISNULL(e.BranchCode, '') as BranchCode,
+          ISNULL(e.AccHolder, '') as AccHolder,
+          ISNULL(e.BankAccNo, '') as BankAccNo,
+          (SELECT TOP 1 h.Work_Date 
+           FROM dbo.THour_Data_View h 
+           WHERE h.Employee_ID_FK = e.ID 
+           ORDER BY h.Work_Date DESC) as lastWorkedDate
+        FROM ${this.tableName} e
+        ORDER BY e.LastName, e.FirstName`
+      );
+      
+      // Log a sample record to see structure
+      if (result.length > 0) {
+        console.log('Sample employee record:', JSON.stringify(result[0]));
+      }
+      
+      // Format the results and provide fallbacks for missing data
+      const formattedResults = result.map(emp => {
+        // If neither FirstName nor LastName has data, use "-" as fallback
+        const nameStr = `${emp.FirstName || ''} ${emp.LastName || ''}`.trim(); 
+        const fullName = nameStr || '-';
+        
+        return {
+          ...emp,
+          LastName: emp.LastName || '',
+          FirstName: emp.FirstName || '',
+          fullName,
+          knownAs: emp.knownAs || '',
+          IDNumber: emp.IDNumber || '',
+          BankName: emp.BankName || '',
+          BranchCode: emp.BranchCode || '',
+          AccHolder: emp.AccHolder || '',
+          BankAccNo: emp.BankAccNo || ''
+        };
+      });
+      
+      // Log a sample formatted record
+      if (formattedResults.length > 0) {
+        console.log('Sample formatted record:', JSON.stringify(formattedResults[0]));
+      }
+      
+      console.log(`Found ${formattedResults.length} employees with last worked dates`);
+      return formattedResults;
+    } catch (error) {
+      console.error('Error in findAllWithLastWorkedDate:', error);
+      throw error;
+    }
+  }
+
+  async findByIdWithDetails(id: number): Promise<EmployeeWithLastWorked | null> {
+    try {
+      console.log(`Fetching employee details for ID: ${id}`);
+      const result = await this.executeQuery<EmployeeWithLastWorked>(
+        `SELECT 
+          e.ID, 
+          e.EmplNo, 
+          ISNULL(e.LastName, '') as LastName, 
+          ISNULL(e.FirstName, '') as FirstName, 
+          ISNULL(e.knownAs, '') as knownAs, 
+          e.RATE, 
+          ISNULL(e.IDNumber, '') as IDNumber, 
+          e.DateEngaged,
+          ISNULL(e.BankName, '') as BankName,
+          ISNULL(e.BranchCode, '') as BranchCode,
+          ISNULL(e.AccHolder, '') as AccHolder,
+          ISNULL(e.BankAccNo, '') as BankAccNo,
+          (SELECT TOP 1 h.Work_Date 
+           FROM dbo.THour_Data_View h 
+           WHERE h.Employee_ID_FK = e.ID 
+           ORDER BY h.Work_Date DESC) as lastWorkedDate
+        FROM ${this.tableName} e
+        WHERE e.ID = @id`,
+        { id }
+      );
+      
+      if (result.length === 0) {
+        console.log(`No employee found with ID: ${id}`);
+        return null;
+      }
+      
+      // Format the results and provide fallbacks for missing data
+      const nameStr = `${result[0].FirstName || ''} ${result[0].LastName || ''}`.trim(); 
+      const fullName = nameStr || '-';
+      
+      const employee = {
+        ...result[0],
+        LastName: result[0].LastName || '',
+        FirstName: result[0].FirstName || '',
+        fullName,
+        knownAs: result[0].knownAs || '',
+        IDNumber: result[0].IDNumber || '',
+        BankName: result[0].BankName || '',
+        BranchCode: result[0].BranchCode || '',
+        AccHolder: result[0].AccHolder || '',
+        BankAccNo: result[0].BankAccNo || ''
+      };
+      
+      console.log(`Found employee details for ID: ${id}`);
+      return employee;
+    } catch (error) {
+      console.error(`Error in findByIdWithDetails for ID: ${id}:`, error);
       throw error;
     }
   }

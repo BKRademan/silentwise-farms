@@ -7,6 +7,10 @@ export interface Employee {
   RATE: number | null;
   IDNumber: string | null;
   DateEngaged: Date | null;
+  BankName: string | null;
+  BranchCode: string | null;
+  AccHolder: string | null;
+  BankAccNo: string | null;
 }
 
 export interface Grower {

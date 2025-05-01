@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Truck, Clock, Shield, Beaker } from 'lucide-react';
+import { Menu, X, Home, Truck, Clock, Shield, Beaker, Users } from 'lucide-react';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -11,6 +11,7 @@ interface MainLayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
+  { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Hours', href: '/hours', icon: Clock },
   { name: 'Transport', href: '/transport', icon: Truck },
   { name: 'PPE', href: '/ppe', icon: Shield },

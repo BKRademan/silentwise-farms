@@ -1,17 +1,26 @@
 import { NextRequest } from 'next/server';
-import { EmployeeDAO } from '@/lib/db';
+import { EmployeeDAO } from '@/lib/db/employee-dao';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { Employee } from '@/types/database';
 import { NextResponse } from 'next/server';
-
-const employeeDao = new EmployeeDAO();
+import { HoursDAO } from '@/lib/db/hours-dao';
 
 export async function GET() {
-  const employees = await employeeDao.findActive();
-  return NextResponse.json(employees);
+  try {
+    const employeeDao = new EmployeeDAO();
+    const employees = await employeeDao.findAllWithLastWorkedDate();
+    return NextResponse.json(employees);
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch employees' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
+  const employeeDao = new EmployeeDAO();
   return handleApiRoute(async () => {
     const body = await request.json();
     
@@ -34,6 +43,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const employeeDao = new EmployeeDAO();
   return handleApiRoute(async () => {
     const body = await request.json();
     
