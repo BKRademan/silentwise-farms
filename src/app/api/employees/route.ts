@@ -35,7 +35,11 @@ export async function POST(request: NextRequest) {
       knownAs: body.knownAs || null,
       RATE: body.RATE || null,
       IDNumber: body.IDNumber || null,
-      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : null
+      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : null,
+      BankName: body.BankName || null,
+      BranchCode: body.BranchCode || null,
+      AccHolder: body.AccHolder || null,
+      BankAccNo: body.BankAccNo || null
     };
 
     return employeeDao.addEmployee(employee);
@@ -58,7 +62,11 @@ export async function PUT(request: NextRequest) {
       knownAs: body.knownAs,
       RATE: body.RATE,
       IDNumber: body.IDNumber,
-      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : undefined
+      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : undefined,
+      BankName: body.BankName,
+      BranchCode: body.BranchCode,
+      AccHolder: body.AccHolder,
+      BankAccNo: body.BankAccNo
     };
 
     await employeeDao.updateEmployee(body.id, updates);
