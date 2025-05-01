@@ -53,6 +53,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       <Link
                         key={item.name}
                         href={item.href}
+                        onClick={() => setSidebarOpen(false)}
                         className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
                           pathname === item.href
                             ? 'bg-gray-100 text-gray-900'
