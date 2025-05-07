@@ -10,6 +10,8 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import { AvailableEmployeeNumbers } from '@/components/employees/available-employee-numbers';
+import { Badge } from '@/components/ui/badge';
 
 interface Employee {
   ID: number;
@@ -177,6 +179,22 @@ export default function EmployeesPage() {
     }
   }, [loading, employees]);
 
+  // Handler for when an employee number is selected
+  const handleSelectEmployeeNumber = (emplNo: string) => {
+    // Set search term to the selected employee number
+    setSearchTerm(emplNo);
+  };
+
+  // Calculate counts for buttons
+  const noIdCount = useMemo(() => {
+    return employees.filter(emp => !emp.IDNumber).length;
+  }, [employees]);
+
+  const duplicateIdCount = useMemo(() => {
+    // Return the count of distinct duplicate ID numbers
+    return duplicateIDNumbers.length;
+  }, [duplicateIDNumbers]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -187,64 +205,72 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* Heading row */}
+      <div>
         <h1 className="text-2xl font-bold">Employees</h1>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search by name or ID..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
       </div>
 
-      {/* Filter controls */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <button 
+      {/* Filters row with search - all on one line */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={showOnlyAvailable ? "default" : "outline"}
+          size="sm"
           onClick={() => {
             setShowOnlyAvailable(!showOnlyAvailable);
-            if (!showOnlyAvailable) setShowOnlyDuplicateIDs(false); // Disable duplicate filter when enabling available
+            setShowOnlyDuplicateIDs(false);
           }}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md border bg-white hover:bg-gray-50 transition-colors ${showOnlyAvailable ? 'border-primary' : ''}`}
+          className="h-8 px-2 sm:h-9 sm:px-3"
         >
-          {showOnlyAvailable ? (
-            <CheckSquare className="h-5 w-5 text-primary" />
-          ) : (
-            <Square className="h-5 w-5" />
-          )}
-          <span className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            <span>Show only available employees</span>
-          </span>
-        </button>
-
-        <button 
+          {showOnlyAvailable ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
+          <span className="text-xs sm:text-sm">No ID Number</span>
+          <Badge 
+            variant={showOnlyAvailable ? "default" : "outline"} 
+            className={`ml-1 text-xs ${showOnlyAvailable ? "bg-primary text-primary-foreground" : ""}`}
+          >
+            {loading ? "..." : noIdCount}
+          </Badge>
+        </Button>
+        
+        <Button
+          variant={showOnlyDuplicateIDs ? "default" : "outline"}
+          size="sm"
           onClick={() => {
             setShowOnlyDuplicateIDs(!showOnlyDuplicateIDs);
-            if (!showOnlyDuplicateIDs) setShowOnlyAvailable(false); // Disable available filter when enabling duplicates
+            setShowOnlyAvailable(false);
           }}
-          className={`flex items-center gap-2 px-3 py-2 rounded-md border bg-white hover:bg-gray-50 transition-colors ${showOnlyDuplicateIDs ? 'border-primary' : ''}`}
+          className="h-8 px-2 sm:h-9 sm:px-3"
         >
-          {showOnlyDuplicateIDs ? (
-            <CheckSquare className="h-5 w-5 text-primary" />
-          ) : (
-            <Square className="h-5 w-5" />
-          )}
-          <span className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-orange-600" />
-            <span>Show only duplicate ID numbers</span>
-          </span>
-        </button>
+          {showOnlyDuplicateIDs ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
+          <span className="text-xs sm:text-sm">Duplicate IDs</span>
+          <Badge 
+            variant={showOnlyDuplicateIDs ? "default" : "outline"} 
+            className={`ml-1 text-xs ${showOnlyDuplicateIDs ? "bg-primary text-primary-foreground" : ""}`}
+          >
+            {loading ? "..." : duplicateIdCount}
+          </Badge>
+        </Button>
+        
+        <div className="ml-auto flex gap-2 items-center">
+          <AvailableEmployeeNumbers onSelect={handleSelectEmployeeNumber} />
+          
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by name or ID..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Legend for highlighted rows */}
       <div className="flex flex-col gap-2 p-3 border rounded-md bg-white">
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-yellow-50 border border-yellow-200 rounded"></div>
-          <span className="text-sm font-medium text-gray-700">Highlighted employees are available (no ID number assigned)</span>
+          <span className="text-sm font-medium text-gray-700">No ID Number</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-block font-bold text-red-600 w-auto">21 Nov 2023</span>

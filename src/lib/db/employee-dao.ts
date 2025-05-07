@@ -270,4 +270,18 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       throw error;
     }
   }
+
+  async getAvailableEmployeeNumbers(): Promise<{FANumber: string}[]> {
+    try {
+      console.log('Fetching available employee numbers...');
+      const result = await this.executeQuery<{FANumber: string}>(
+        `SELECT FANumber FROM dbo.TEmployee_Avail_EmplNo ORDER BY FANumber`
+      );
+      console.log(`Found ${result.length} available employee numbers`);
+      return result;
+    } catch (error) {
+      console.error('Error in getAvailableEmployeeNumbers:', error);
+      throw error;
+    }
+  }
 } 
