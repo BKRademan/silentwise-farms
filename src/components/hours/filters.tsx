@@ -77,10 +77,17 @@ export function Filters({ onFiltersChange }: FiltersProps) {
       params.delete('growerId');
     }
     
-    if (newFilters.employeeId) {
+    // Special handling for employeeId
+    if (newFilters.employeeId === "all") {
+      // For "all" we'll use a special parameter to indicate all employees
+      params.set('allEmployees', 'true');
+      params.delete('employeeId');
+    } else if (newFilters.employeeId) {
       params.set('employeeId', newFilters.employeeId);
+      params.delete('allEmployees');
     } else {
       params.delete('employeeId');
+      params.delete('allEmployees');
     }
     
     // Update URL and notify parent
@@ -196,6 +203,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
               });
             }}
             placeholder="Select Employee"
+            enableSelectAll={true}
           />
         </div>
       </div>

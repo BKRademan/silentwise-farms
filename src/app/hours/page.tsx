@@ -110,14 +110,14 @@ function HoursContent() {
 
       if (data.success) {
         console.log('✅ Successfully fetched hours records:', data.data.length, 'records');
-        // Sort records by date descending and then by employee ascending
+        // Sort records by Employee (EmplNo) ascending first, then by date descending
         const sortedRecords = [...data.data].sort((a, b) => {
-          // First sort by date descending
-          const dateComparison = new Date(b.Work_Date).getTime() - new Date(a.Work_Date).getTime();
-          if (dateComparison !== 0) return dateComparison;
+          // First sort by Employee ascending (this is actually the EmplNo field)
+          const employeeComparison = (a.Employee || '').localeCompare(b.Employee || '');
+          if (employeeComparison !== 0) return employeeComparison;
           
-          // Then sort by employee ascending
-          return (a.Employee || '').localeCompare(b.Employee || '');
+          // Then sort by date descending
+          return new Date(b.Work_Date).getTime() - new Date(a.Work_Date).getTime();
         });
         setRecords(sortedRecords);
       } else {

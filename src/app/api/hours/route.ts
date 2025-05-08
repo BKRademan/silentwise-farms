@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const endDateISO = searchParams.get('endDate');
     const employeeId = searchParams.get('employeeId');
     const growerId = searchParams.get('growerId');
+    const allEmployees = searchParams.get('allEmployees') === 'true';
 
     if (!startDateISO || !endDateISO) {
       throw new ValidationError('Start date and end date are required');
@@ -26,6 +27,13 @@ export async function GET(request: NextRequest) {
       records = await hoursDao.getHoursByGrowerEmployeeAndDate(
         parseInt(growerId),
         parseInt(employeeId),
+        start,
+        end
+      );
+    } else if (growerId && allEmployees) {
+      // Get all employees for this grower (already handled by getHoursByGrowerAndDate)
+      records = await hoursDao.getHoursByGrowerAndDate(
+        parseInt(growerId),
         start,
         end
       );
