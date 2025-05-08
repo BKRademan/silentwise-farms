@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { UserCheck, X, ListFilter } from 'lucide-react';
+import { UserCheck, X, ListFilter, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,12 +25,13 @@ export function AvailableEmployeeNumbers({ onSelect }: AvailableEmployeeNumbersP
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAvailableNumbers = async () => {
-    if (isOpen) {
+  const fetchAvailableNumbers = async (forceRefresh = false) => {
+    if (isOpen || forceRefresh) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch('/api/employees/available');
+        // Add cache-busting parameter to ensure fresh data
+        const response = await fetch(`/api/employees/available?t=${Date.now()}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch available employee numbers');
@@ -58,6 +59,10 @@ export function AvailableEmployeeNumbers({ onSelect }: AvailableEmployeeNumbersP
     setIsOpen(false);
   };
 
+  const handleRefresh = () => {
+    fetchAvailableNumbers(true);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -70,9 +75,20 @@ export function AvailableEmployeeNumbers({ onSelect }: AvailableEmployeeNumbersP
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-bold">Available Employee Numbers</DialogTitle>
-            <Badge variant="outline" className="ml-2">
-              {isLoading ? "..." : availableNumbers.length}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleRefresh} 
+                disabled={isLoading}
+                title="Refresh data"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              </Button>
+              <Badge variant="outline" className="ml-2">
+                {isLoading ? "..." : availableNumbers.length}
+              </Badge>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
             These are employee numbers that can be used for new employees. Click on a number to filter the employee list.

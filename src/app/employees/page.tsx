@@ -115,22 +115,24 @@ export default function EmployeesPage() {
     // Apply availability filter if enabled (and duplicate filter is not)
     else if (showOnlyAvailable) {
       filtered = filtered.filter(emp => {
-        // Must have no ID Number
-        const hasNoIDNumber = !emp.IDNumber;
-        
-        // AND either has no last worked date OR it's older than 2 months
-        const hasNeverWorked = !emp.lastWorkedDate;
-        const hasOldWorkDate = emp.lastWorkedDate ? isOlderThanTwoMonths(emp.lastWorkedDate) : false;
-        
-        return hasNoIDNumber && (hasNeverWorked || hasOldWorkDate);
+        // Only filter by ID Number - ignore Last Worked Date
+        return !emp.IDNumber;
       });
       
-      // Sort by ID when not showing duplicates
-      filtered = [...filtered].sort((a, b) => a.ID - b.ID);
+      // Sort by EmplNo instead of ID
+      filtered = [...filtered].sort((a, b) => {
+        const emplNoA = a.EmplNo || '';
+        const emplNoB = b.EmplNo || '';
+        return emplNoA.localeCompare(emplNoB);
+      });
     }
     // Otherwise just sort by ID (default)
     else {
-      filtered = [...filtered].sort((a, b) => a.ID - b.ID);
+      filtered = [...filtered].sort((a, b) => {
+        const emplNoA = a.EmplNo || '';
+        const emplNoB = b.EmplNo || '';
+        return emplNoA.localeCompare(emplNoB);
+      });
     }
     
     setFilteredEmployees(filtered);
