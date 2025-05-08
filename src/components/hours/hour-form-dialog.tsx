@@ -211,6 +211,26 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
         values.Work_Date!.getDate()
       ));
 
+      // Check for duplicate employee records on the same day
+      const checkDuplicateUrl = `/api/hours/check-duplicate?employeeId=${values.Employee_ID_FK}&workDate=${utcDate.toISOString()}`;
+      
+      // Add the record ID if in edit mode to exclude the current record
+      const checkUrl = mode === 'edit' && initialData?.ID 
+        ? `${checkDuplicateUrl}&recordId=${initialData.ID}` 
+        : checkDuplicateUrl;
+      
+      const duplicateCheck = await fetch(checkUrl);
+      const duplicateResult = await duplicateCheck.json();
+      
+      if (duplicateResult.data.exists) {
+        toast({
+          variant: "destructive",
+          title: "Duplicate Record",
+          description: "An hour record already exists for this employee on this date. Please choose a different employee or date.",
+        });
+        return;
+      }
+
       const body = mode === 'edit' 
         ? { ...values, id: initialData?.ID, Work_Date: utcDate } 
         : { ...values, Work_Date: utcDate };

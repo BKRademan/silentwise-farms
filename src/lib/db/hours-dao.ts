@@ -306,4 +306,39 @@ export class HoursDAO extends BaseDAO<HourRecord> {
       throw error;
     }
   }
+
+  async checkEmployeeRecordExists(employeeId: number, workDate: Date, recordId?: number): Promise<boolean> {
+    console.log('Checking if employee record exists:', { employeeId, workDate, recordId });
+    try {
+      // Format the date for SQL query
+      const formattedDate = this.formatSQLDate(workDate);
+      
+      // Build the query - include the recordId check to exclude the current record when editing
+      let query = `
+        SELECT COUNT(*) as count 
+        FROM dbo.THours 
+        WHERE Employee_ID_FK = @employeeId 
+        AND CONVERT(date, Work_Date) = CONVERT(date, @workDate)`;
+      
+      const params: any = { 
+        employeeId, 
+        workDate: formattedDate 
+      };
+
+      // If recordId is provided (when editing), exclude that record from the check
+      if (recordId) {
+        query += ' AND ID <> @recordId';
+        params.recordId = recordId;
+      }
+
+      const result = await this.executeQuery<{ count: number }>(query, params);
+      
+      const exists = result[0]?.count > 0;
+      console.log(`Employee ${employeeId} record on ${workDate.toISOString()} exists: ${exists}`);
+      return exists;
+    } catch (error) {
+      console.error('Error checking if employee record exists:', error);
+      throw error;
+    }
+  }
 } 
