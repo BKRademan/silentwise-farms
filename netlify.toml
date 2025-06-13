@@ -1,0 +1,28 @@
+[build]
+  publish = ".next"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+    Netlify-CDN-Cache-Control = "no-cache"
+
+# Disable caching for the specific available employees endpoint
+[[headers]]
+  for = "/api/employees/available"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+    Netlify-CDN-Cache-Control = "no-cache"
+    CDN-Cache-Control = "no-cache"
+
+# Next.js specific configuration for Netlify
+[build.environment]
+  NEXT_RUNTIME = "nodejs"
+
+# Disable build caching that might interfere
+[build.processing]
+  skip_processing = false 

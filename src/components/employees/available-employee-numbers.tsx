@@ -31,13 +31,29 @@ export function AvailableEmployeeNumbers({ onSelect }: AvailableEmployeeNumbersP
       setError(null);
       try {
         // Add cache-busting parameter to ensure fresh data
-        const response = await fetch(`/api/employees/available?t=${Date.now()}`);
+        const timestamp = Date.now();
+        const url = `/api/employees/available?t=${timestamp}&refresh=${forceRefresh ? 'true' : 'false'}`;
+        console.log('[Available Numbers] Fetching from:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
+        
+        console.log('[Available Numbers] Response status:', response.status);
+        console.log('[Available Numbers] Response headers:', Object.fromEntries(response.headers.entries()));
         
         if (!response.ok) {
           throw new Error('Failed to fetch available employee numbers');
         }
         
         const data = await response.json();
+        console.log('[Available Numbers] Data received:', data.length, 'numbers');
+        console.log('[Available Numbers] Sample data:', data.slice(0, 3));
         setAvailableNumbers(data);
       } catch (error) {
         console.error('Error fetching available employee numbers:', error);
