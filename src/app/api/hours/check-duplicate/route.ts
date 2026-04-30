@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { HoursDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const hoursDao = new HoursDAO();
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const exists = await hoursDao.checkEmployeeRecordExists(
       parseInt(employeeId),
-      new Date(workDate),
+      requireSouthAfricaDateOnly(workDate, 'workDate'),
       recordId ? parseInt(recordId) : undefined
     );
 

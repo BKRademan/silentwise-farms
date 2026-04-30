@@ -15,8 +15,8 @@ export type AttendanceStatus =
 export interface Schedule {
   ID: number;
   Grower_ID: number;
-  Start_Date: Date;
-  End_Date: Date;
+  Start_Date: Date | string;
+  End_Date: Date | string;
   Default_Hours: number | null;
   Status: ScheduleStatus;
   Created_At: Date;
@@ -34,7 +34,7 @@ export interface ScheduleAttendance {
   ID: number;
   Schedule_ID: number;
   Employee_ID: number;
-  Work_Date: Date;
+  Work_Date: Date | string;
   Status: AttendanceStatus;
   Hours_Worked: number | null;
   Overtime_Hours: number | null;

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { TransportDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { Transport } from '@/types/database';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const transportDao = new TransportDAO();
 
@@ -15,8 +16,8 @@ export async function GET(request: NextRequest) {
 
     if (startDate && endDate) {
       return transportDao.getTransportByDateRange(
-        new Date(startDate),
-        new Date(endDate)
+        requireSouthAfricaDateOnly(startDate, 'startDate'),
+        requireSouthAfricaDateOnly(endDate, 'endDate')
       );
     }
 
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     const transport: Omit<Transport, 'ID'> = {
       Grower_ID_FK: body.Grower_ID_FK,
-      Date: new Date(body.Date),
+      Date: requireSouthAfricaDateOnly(body.Date, 'Date'),
       KM: body.KM,
       RatePerKM: body.RatePerKM || null,
       Driver: body.Driver,
@@ -63,7 +64,7 @@ export async function PUT(request: NextRequest) {
 
     const updates: Partial<Transport> = {
       Grower_ID_FK: body.Grower_ID_FK,
-      Date: body.Date ? new Date(body.Date) : undefined,
+      Date: body.Date ? requireSouthAfricaDateOnly(body.Date, 'Date') : undefined,
       KM: body.KM,
       RatePerKM: body.RatePerKM,
       Driver: body.Driver,

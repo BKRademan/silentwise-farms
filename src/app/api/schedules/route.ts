@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ScheduleDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { CreateScheduleInput } from '@/types/schedule';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const scheduleDao = new ScheduleDAO();
 
@@ -17,9 +18,9 @@ export async function GET(request: NextRequest) {
       growerId: growerId ? parseInt(growerId, 10) : undefined,
       status: status ?? undefined,
       rangeStart:
-        rangeStart && rangeEnd ? new Date(rangeStart) : undefined,
+        rangeStart && rangeEnd ? requireSouthAfricaDateOnly(rangeStart, 'rangeStart') : undefined,
       rangeEnd:
-        rangeStart && rangeEnd ? new Date(rangeEnd) : undefined,
+        rangeStart && rangeEnd ? requireSouthAfricaDateOnly(rangeEnd, 'rangeEnd') : undefined,
     });
   });
 }
@@ -36,7 +37,11 @@ export async function POST(request: NextRequest) {
     if (body.employeeIds.length === 0) {
       throw new ValidationError('At least one employee is required');
     }
-    const id = await scheduleDao.createSchedule(body);
+    const id = await scheduleDao.createSchedule({
+      ...body,
+      Start_Date: requireSouthAfricaDateOnly(body.Start_Date, 'Start_Date'),
+      End_Date: requireSouthAfricaDateOnly(body.End_Date, 'End_Date'),
+    });
     return { id };
   });
 }

@@ -43,6 +43,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/components/ui/use-toast";
 import { Combobox } from "@/components/ui/combobox";
 import { useData } from '@/lib/contexts/data-context';
+import { requireSouthAfricaDateOnly } from "@/lib/date-time/south-africa";
 
 // Type definitions for form data
 interface Employee {
@@ -204,15 +205,10 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
     try {
       setIsSubmitting(true);
       
-      // Convert the Work_Date to UTC midnight to prevent timezone issues
-      const utcDate = new Date(Date.UTC(
-        values.Work_Date!.getFullYear(),
-        values.Work_Date!.getMonth(),
-        values.Work_Date!.getDate()
-      ));
+      const workDate = requireSouthAfricaDateOnly(values.Work_Date, 'Work_Date');
 
       // Check for duplicate employee records on the same day
-      const checkDuplicateUrl = `/api/hours/check-duplicate?employeeId=${values.Employee_ID_FK}&workDate=${utcDate.toISOString()}`;
+      const checkDuplicateUrl = `/api/hours/check-duplicate?employeeId=${values.Employee_ID_FK}&workDate=${workDate}`;
       
       // Add the record ID if in edit mode to exclude the current record
       const checkUrl = mode === 'edit' && initialData?.ID 
@@ -232,8 +228,8 @@ export function HourFormDialog({ open, onClose, initialData, mode, onSuccess }: 
       }
 
       const body = mode === 'edit' 
-        ? { ...values, id: initialData?.ID, Work_Date: utcDate } 
-        : { ...values, Work_Date: utcDate };
+        ? { ...values, id: initialData?.ID, Work_Date: workDate } 
+        : { ...values, Work_Date: workDate };
 
       const endpoint = '/api/hours';
       const method = mode === 'create' ? 'POST' : 'PUT';

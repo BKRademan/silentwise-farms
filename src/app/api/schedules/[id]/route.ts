@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ScheduleDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { UpdateScheduleInput } from '@/types/schedule';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const scheduleDao = new ScheduleDAO();
 
@@ -22,7 +23,15 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const id = parseInt(context.params.id, 10);
     if (Number.isNaN(id)) throw new ValidationError('Invalid id');
     const body = (await request.json()) as UpdateScheduleInput;
-    await scheduleDao.updateSchedule(id, body);
+    await scheduleDao.updateSchedule(id, {
+      ...body,
+      Start_Date: body.Start_Date
+        ? requireSouthAfricaDateOnly(body.Start_Date, 'Start_Date')
+        : undefined,
+      End_Date: body.End_Date
+        ? requireSouthAfricaDateOnly(body.End_Date, 'End_Date')
+        : undefined,
+    });
     return { message: 'Schedule updated' };
   });
 }

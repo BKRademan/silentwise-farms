@@ -1,19 +1,34 @@
 import { BaseDAO } from './base-dao';
 import { Transport } from '@/types/database';
+import { addDaysToDateOnly, toSouthAfricaDateOnly, toSqlDateTimeStartOfDay } from '@/lib/date-time/south-africa';
 
 export class TransportDAO extends BaseDAO<Transport> {
   constructor() {
     super('dbo.TTransport');
   }
 
-  async getTransportByDateRange(startDate: Date, endDate: Date): Promise<Transport[]> {
+  private formatSQLDate(date: Date | string | null | undefined): string | null {
+    return toSqlDateTimeStartOfDay(date);
+  }
+
+  private formatExclusiveEndDate(date: Date | string): string {
+    const dateOnly = toSouthAfricaDateOnly(date);
+    if (!dateOnly) throw new Error('End date is required');
+    return `${addDaysToDateOnly(dateOnly, 1)} 00:00:00.000`;
+  }
+
+  async getTransportByDateRange(startDate: Date | string, endDate: Date | string): Promise<Transport[]> {
     return this.executeQuery<Transport>(
       `SELECT t.*, g.GrowerName 
        FROM ${this.tableName} t
        LEFT JOIN dbo.TGrowers g ON t.Grower_ID_FK = g.ID
-       WHERE t.Date BETWEEN @startDate AND @endDate
+       WHERE t.Date >= CONVERT(datetime2, @startDate, 121)
+         AND t.Date < CONVERT(datetime2, @endDate, 121)
        ORDER BY t.Date DESC`,
-      { startDate, endDate }
+      {
+        startDate: this.formatSQLDate(startDate),
+        endDate: this.formatExclusiveEndDate(endDate),
+      }
     );
   }
 
@@ -45,13 +60,13 @@ export class TransportDAO extends BaseDAO<Transport> {
         Grower_ID_FK, Date, KM,
         RatePerKM, Driver, Comment
       ) VALUES (
-        @growerId, @date, @km,
+        @growerId, CONVERT(datetime2, @date, 121), @km,
         @ratePerKM, @driver, @comment
       );
       SELECT SCOPE_IDENTITY() as ID;`,
       {
         growerId: transport.Grower_ID_FK,
-        date: transport.Date,
+        date: this.formatSQLDate(transport.Date),
         km: transport.KM,
         ratePerKM: transport.RatePerKM,
         driver: transport.Driver,
@@ -68,15 +83,24 @@ export class TransportDAO extends BaseDAO<Transport> {
   async updateTransport(id: number, transport: Partial<Transport>): Promise<void> {
     const updates = Object.entries(transport)
       .filter(([key]) => key !== 'ID')
-      .map(([key]) => `${key} = @${key}`)
+      .map(([key]) => (
+        key === 'Date'
+          ? `${key} = CONVERT(datetime2, @${key}, 121)`
+          : `${key} = @${key}`
+      ))
       .join(', ');
+
+    const normalizedTransport = {
+      ...transport,
+      Date: transport.Date ? this.formatSQLDate(transport.Date) : transport.Date,
+    };
 
     await this.executeQuery(
       `UPDATE ${this.tableName} 
        SET ${updates}
        WHERE ID = @id`,
       {
-        ...transport,
+        ...normalizedTransport,
         id
       }
     );
@@ -91,8 +115,8 @@ export class TransportDAO extends BaseDAO<Transport> {
 
   async getTransportSummaryByGrower(
     growerId: number,
-    startDate: Date,
-    endDate: Date
+    startDate: Date | string,
+    endDate: Date | string
   ): Promise<{ totalKM: number; totalCost: number }> {
     const result = await this.executeQuery<{ totalKM: number; totalCost: number }>(
       `SELECT 
@@ -100,8 +124,13 @@ export class TransportDAO extends BaseDAO<Transport> {
         SUM(KM * RatePerKM) as totalCost
        FROM ${this.tableName}
        WHERE Grower_ID_FK = @growerId
-       AND Date BETWEEN @startDate AND @endDate`,
-      { growerId, startDate, endDate }
+       AND Date >= CONVERT(datetime2, @startDate, 121)
+       AND Date < CONVERT(datetime2, @endDate, 121)`,
+      {
+        growerId,
+        startDate: this.formatSQLDate(startDate),
+        endDate: this.formatExclusiveEndDate(endDate),
+      }
     );
 
     return result[0] || { totalKM: 0, totalCost: 0 };

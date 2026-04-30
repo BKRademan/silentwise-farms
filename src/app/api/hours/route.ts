@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { HoursDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { HourRecord } from '@/types/database';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const hoursDao = new HoursDAO();
 
@@ -18,8 +19,8 @@ export async function GET(request: NextRequest) {
       throw new ValidationError('Start date and end date are required');
     }
 
-    const start = new Date(startDateISO);
-    const end = new Date(endDateISO);
+    const start = requireSouthAfricaDateOnly(startDateISO, 'startDate');
+    const end = requireSouthAfricaDateOnly(endDateISO, 'endDate');
 
     let records: HourRecord[];
 
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       // Just get records by date range
       records = await hoursDao.getHoursByDateRange(
         start,
-        new Date(end.getTime() - 1)  // Subtract 1ms to make end date inclusive
+        end
       );
     }
 
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const hourRecord: Omit<HourRecord, 'ID'> = {
-      Work_Date: new Date(body.Work_Date),
+      Work_Date: requireSouthAfricaDateOnly(body.Work_Date, 'Work_Date'),
       Hours_Worked: body.Hours_Worked,
       Employee_ID_FK: body.Employee_ID_FK,
       Employee: body.Employee,
@@ -104,7 +105,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updates: Partial<HourRecord> = {
-      Work_Date: body.Work_Date ? new Date(body.Work_Date) : undefined,
+      Work_Date: body.Work_Date ? requireSouthAfricaDateOnly(body.Work_Date, 'Work_Date') : undefined,
       Hours_Worked: body.Hours_Worked,
       Employee_ID_FK: body.Employee_ID_FK,
       Grower_ID: body.Grower_ID,

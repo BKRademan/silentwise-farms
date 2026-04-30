@@ -9,6 +9,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
 import { useData } from '@/lib/contexts/data-context';
 import { useCallback } from 'react';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 interface FiltersProps {
   onFiltersChange: (filters: {
@@ -53,19 +54,14 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   }) => {
     const params = new URLSearchParams(searchParams.toString());
     
-    // Convert dates to UTC start/end of day
     if (newFilters.startDate) {
-      const start = new Date(newFilters.startDate);
-      const utcStart = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
-      params.set('startDate', utcStart.toISOString());
+      params.set('startDate', requireSouthAfricaDateOnly(newFilters.startDate, 'startDate'));
     } else {
       params.delete('startDate');
     }
     
     if (newFilters.endDate) {
-      const end = new Date(newFilters.endDate);
-      const utcEnd = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate() + 1));
-      params.set('endDate', utcEnd.toISOString());
+      params.set('endDate', requireSouthAfricaDateOnly(newFilters.endDate, 'endDate'));
     } else {
       params.delete('endDate');
     }
@@ -100,14 +96,11 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   function handleDateSelect(date: Date | undefined) {
     if (!date) return;
     
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+    const selectedDate = requireSouthAfricaDateOnly(date, 'date');
     
     updateFilters({
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
+      startDate: selectedDate,
+      endDate: selectedDate,
       growerId: selectedGrowerId || undefined,
       employeeId: selectedEmployeeId || undefined
     });
@@ -179,8 +172,8 @@ export function Filters({ onFiltersChange }: FiltersProps) {
             onValueChange={(value: string) => {
               setSelectedGrowerId(value);
               updateFilters({
-                startDate: startDate?.toISOString(),
-                endDate: endDate?.toISOString(),
+                startDate: startDate ? requireSouthAfricaDateOnly(startDate, 'startDate') : undefined,
+                endDate: endDate ? requireSouthAfricaDateOnly(endDate, 'endDate') : undefined,
                 growerId: value || undefined,
                 employeeId: selectedEmployeeId || undefined
               });
@@ -196,8 +189,8 @@ export function Filters({ onFiltersChange }: FiltersProps) {
             onValueChange={(value: string) => {
               setSelectedEmployeeId(value);
               updateFilters({
-                startDate: startDate?.toISOString(),
-                endDate: endDate?.toISOString(),
+                startDate: startDate ? requireSouthAfricaDateOnly(startDate, 'startDate') : undefined,
+                endDate: endDate ? requireSouthAfricaDateOnly(endDate, 'endDate') : undefined,
                 growerId: selectedGrowerId || undefined,
                 employeeId: value || undefined
               });

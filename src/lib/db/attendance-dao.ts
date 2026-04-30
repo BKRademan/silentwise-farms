@@ -1,6 +1,7 @@
 import { BaseDAO } from './base-dao';
 import { HoursDAO } from './hours-dao';
 import { MarkAttendanceInput, Schedule, ScheduleAttendance, AttendanceStatus } from '@/types/schedule';
+import { SQL_SOUTH_AFRICA_NOW, toSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const hoursDao = new HoursDAO();
 
@@ -9,24 +10,22 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
     super('dbo.TScheduleAttendance');
   }
 
-  /**
-   * Normalize a date to UTC midnight to prevent timezone shifts
-   */
-  private normalizeDateToUTC(dateInput: string | Date): Date {
-    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  private normalizeDateOnly(dateInput: string | Date): string {
+    const dateOnly = toSouthAfricaDateOnly(dateInput);
+    if (!dateOnly) throw new Error('Date is required');
+    return dateOnly;
   }
 
   async findBySchedule(
     scheduleId: number,
-    workDate?: Date
+    workDate?: Date | string
   ): Promise<ScheduleAttendance[]> {
     if (workDate) {
       return this.executeQuery<ScheduleAttendance>(
         `SELECT * FROM dbo.TScheduleAttendance
-         WHERE Schedule_ID = @scheduleId AND Work_Date = @workDate
+         WHERE Schedule_ID = @scheduleId AND CONVERT(date, Work_Date) = CONVERT(date, @workDate, 23)
          ORDER BY Employee_ID`,
-        { scheduleId, workDate }
+        { scheduleId, workDate: this.normalizeDateOnly(workDate) }
       );
     }
     return this.executeQuery<ScheduleAttendance>(
@@ -82,7 +81,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
       throw new Error('Cannot mark attendance on a schedule that is not active. Finalize the schedule first.');
     }
 
-    const workDate = this.normalizeDateToUTC(input.workDate);
+    const workDate = this.normalizeDateOnly(input.workDate);
 
     if (
       input.status === 'unmarked' &&
@@ -91,7 +90,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
     ) {
       const rows = await this.executeQuery<ScheduleAttendance>(
         `SELECT * FROM dbo.TScheduleAttendance
-         WHERE Schedule_ID = @scheduleId AND Employee_ID = @employeeId AND Work_Date = @workDate`,
+         WHERE Schedule_ID = @scheduleId AND Employee_ID = @employeeId AND CONVERT(date, Work_Date) = CONVERT(date, @workDate, 23)`,
         { scheduleId, employeeId: input.employeeId, workDate }
       );
       const att0 = rows[0];
@@ -119,7 +118,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
 
     const rows = await this.executeQuery<ScheduleAttendance>(
       `SELECT * FROM dbo.TScheduleAttendance
-       WHERE Schedule_ID = @scheduleId AND Employee_ID = @employeeId AND Work_Date = @workDate`,
+       WHERE Schedule_ID = @scheduleId AND Employee_ID = @employeeId AND CONVERT(date, Work_Date) = CONVERT(date, @workDate, 23)`,
       { scheduleId, employeeId: input.employeeId, workDate }
     );
     const att = rows[0];
@@ -182,7 +181,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
         `UPDATE dbo.TScheduleAttendance
          SET Status = 'absent', Hours_Worked = NULL, Overtime_Hours = NULL,
              Absence_Reason = @absenceReason, Hour_Record_ID = NULL,
-             Marked_At = SYSDATETIME(), Marked_By = @markedBy
+            Marked_At = ${SQL_SOUTH_AFRICA_NOW}, Marked_By = @markedBy
          WHERE ID = @id`,
         {
           id: att.ID,
@@ -288,7 +287,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
       `UPDATE dbo.TScheduleAttendance
        SET Status = @status, Hours_Worked = @hoursWorked, Overtime_Hours = @ot,
            Absence_Reason = NULL, Hour_Record_ID = @hourRecordId,
-           Marked_At = SYSDATETIME(), Marked_By = @markedBy
+           Marked_At = ${SQL_SOUTH_AFRICA_NOW}, Marked_By = @markedBy
        WHERE ID = @id`,
       {
         id: att.ID,
@@ -330,7 +329,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
         throw new Error('employeeId and workDate are required for each mark');
       }
 
-      const workDate = this.normalizeDateToUTC(input.workDate);
+      const workDate = this.normalizeDateOnly(input.workDate);
       let resolvedStatus: AttendanceStatus | null =
         input.status === 'unmarked' ? null : (input.status as AttendanceStatus);
 
@@ -342,7 +341,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
         resolvedStatus = 'overtime';
       }
 
-      const workDateKey = workDate.toISOString().slice(0, 10);
+      const workDateKey = workDate;
       preparedMarks.set(`${input.employeeId}-${workDateKey}`, {
         employeeId: input.employeeId,
         workDate: workDateKey,
@@ -489,7 +488,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
            Overtime_Hours = NULL,
            Absence_Reason = w.Absence_Reason,
            Hour_Record_ID = NULL,
-           Marked_At = SYSDATETIME(),
+           Marked_At = ${SQL_SOUTH_AFRICA_NOW},
            Marked_By = w.Marked_By
        FROM dbo.TScheduleAttendance a
        INNER JOIN @Work w ON w.Attendance_ID = a.ID
@@ -551,7 +550,7 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
            Overtime_Hours = CASE WHEN w.Status IN ('present', 'overtime') THEN w.Overtime_Hours ELSE NULL END,
            Absence_Reason = NULL,
            Hour_Record_ID = COALESCE(c.Hour_Record_ID, w.Existing_Hour_Record_ID),
-           Marked_At = SYSDATETIME(),
+           Marked_At = ${SQL_SOUTH_AFRICA_NOW},
            Marked_By = w.Marked_By
        FROM dbo.TScheduleAttendance a
        INNER JOIN @Work w ON w.Attendance_ID = a.ID
@@ -578,14 +577,11 @@ export class AttendanceDAO extends BaseDAO<ScheduleAttendance> {
   ): Promise<ScheduleAttendance> {
     const att = await this.findById(attendanceId);
     if (!att) throw new Error('Attendance record not found');
-    const d = new Date(att.Work_Date as Date);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const workDate = this.normalizeDateOnly(att.Work_Date);
     return this.markAttendance(att.Schedule_ID, {
       ...input,
       employeeId: att.Employee_ID,
-      workDate: input.workDate ?? `${y}-${m}-${day}`,
+      workDate: input.workDate ?? workDate,
     });
   }
 }

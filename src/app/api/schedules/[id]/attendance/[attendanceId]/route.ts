@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { AttendanceDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { MarkAttendanceInput } from '@/types/schedule';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const attendanceDao = new AttendanceDAO();
 
@@ -19,6 +20,11 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (body.status === undefined) {
       throw new ValidationError('status is required');
     }
-    return attendanceDao.updateAttendanceById(attendanceId, body);
+    return attendanceDao.updateAttendanceById(attendanceId, {
+      ...body,
+      workDate: body.workDate
+        ? requireSouthAfricaDateOnly(body.workDate, 'workDate')
+        : undefined,
+    });
   });
 }

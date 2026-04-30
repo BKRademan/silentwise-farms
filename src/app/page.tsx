@@ -114,7 +114,7 @@ export default function Home() {
 
       // Fetch other data...
       const transportResponse = await fetch(
-        `/api/transport?startDate=${startOfDay(today).toISOString()}&endDate=${endOfDay(today).toISOString()}`
+        `/api/transport?startDate=${format(today, 'yyyy-MM-dd')}&endDate=${format(today, 'yyyy-MM-dd')}`
       );
       const transportData = await transportResponse.json();
       

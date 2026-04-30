@@ -1,5 +1,6 @@
 import { BaseDAO } from './base-dao';
 import { Grower } from '@/types/database';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 export class GrowerDAO extends BaseDAO<Grower> {
   constructor() {
@@ -76,14 +77,14 @@ export class GrowerDAO extends BaseDAO<Grower> {
     );
   }
 
-  async getGrowersByDate(date: Date): Promise<Grower[]> {
+  async getGrowersByDate(date: Date | string): Promise<Grower[]> {
     return this.executeQuery<Grower>(
       `SELECT DISTINCT g.* 
        FROM ${this.tableName} g
        INNER JOIN dbo.THour_Data_View h ON g.ID = h.Grower_ID
-       WHERE CAST(h.Work_Date AS DATE) = CAST(@date AS DATE)
+       WHERE CAST(h.Work_Date AS DATE) = CONVERT(date, @date, 23)
        ORDER BY g.GrowerName`,
-      { date }
+      { date: requireSouthAfricaDateOnly(date, 'date') }
     );
   }
 } 

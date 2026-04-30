@@ -6,7 +6,7 @@ export interface Employee {
   knownAs: string | null;
   RATE: number | null;
   IDNumber: string | null;
-  DateEngaged: Date | null;
+  DateEngaged: Date | string | null;
   BankName: string | null;
   BranchCode: string | null;
   AccHolder: string | null;
@@ -33,7 +33,7 @@ export interface Grower {
 export interface Transport {
   ID: number;
   Grower_ID_FK: number | null;
-  Date: Date | null;
+  Date: Date | string | null;
   KM: number | null;
   RatePerKM: number | null;
   Driver: string | null;
@@ -50,14 +50,14 @@ export interface Deduction {
   ID: number;
   Loans: number | null;
   PPE: number | null;
-  Date: Date | null;
+  Date: Date | string | null;
   FK_Emp_ID: string | null;
   FK_PPE_Item: number | null;
 }
 
 export interface HourRecord {
   ID: number;
-  Work_Date: Date | null;
+  Work_Date: Date | string | null;
   Hours_Worked: number | null;
   Employee_ID_FK: number | null;
   Employee: string | null;

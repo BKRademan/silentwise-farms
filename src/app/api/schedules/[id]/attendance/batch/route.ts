@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { AttendanceDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { MarkAttendanceInput } from '@/types/schedule';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const attendanceDao = new AttendanceDAO();
 
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
-    return attendanceDao.markBatch(scheduleId, marks);
+    return attendanceDao.markBatch(
+      scheduleId,
+      marks.map((mark) => ({
+        ...mark,
+        workDate: requireSouthAfricaDateOnly(mark.workDate, 'workDate'),
+      }))
+    );
   });
 }

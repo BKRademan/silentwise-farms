@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { ScheduleDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const scheduleDao = new ScheduleDAO();
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     await scheduleDao.addEmployeeToSchedule(scheduleId, {
       employeeId,
-      startDate,
+      startDate: requireSouthAfricaDateOnly(startDate, 'startDate'),
       endDateOption,
     });
 

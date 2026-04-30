@@ -8,37 +8,37 @@ import {
   RecentEmployeeForGrower,
   UpdateScheduleInput,
 } from '@/types/schedule';
-import { eachDayOfInterval } from 'date-fns';
+import {
+  addDaysToDateOnly,
+  SQL_SOUTH_AFRICA_NOW,
+  toSouthAfricaDateOnly,
+} from '@/lib/date-time/south-africa';
 
 export class ScheduleDAO extends BaseDAO<Schedule> {
   constructor() {
     super('dbo.TSchedule');
   }
 
-  /**
-   * Normalize a date string to UTC midnight to prevent timezone shifts
-   */
-  private normalizeDateToUTC(dateString: string): Date {
-    const date = new Date(dateString);
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  private normalizeDateOnly(dateInput: string | Date): string {
+    const dateOnly = toSouthAfricaDateOnly(dateInput);
+    if (!dateOnly) throw new Error('Date is required');
+    return dateOnly;
   }
 
-  private dateRangeJson(start: Date, end: Date): string {
-    return JSON.stringify(
-      eachDayOfInterval({ start, end }).map((day) => {
-        const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-        return normalizedDay.toISOString().slice(0, 10);
-      })
-    );
+  private dateRangeJson(start: string, end: string): string {
+    const days: string[] = [];
+    for (let day = start; day <= end; day = addDaysToDateOnly(day, 1)) {
+      days.push(day);
+    }
+    return JSON.stringify(days);
   }
 
   async findRecentEmployeesForGrower(
     growerId: number,
     daysBack = 60
   ): Promise<RecentEmployeeForGrower[]> {
-    const since = new Date();
-    since.setDate(since.getDate() - daysBack);
-    since.setHours(0, 0, 0, 0);
+    const today = this.normalizeDateOnly(new Date());
+    const since = `${addDaysToDateOnly(today, -daysBack)} 00:00:00.000`;
 
     return this.executeQuery<RecentEmployeeForGrower>(
       `SELECT e.ID, e.EmplNo, e.FirstName, e.LastName, e.knownAs,
@@ -47,7 +47,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
        FROM dbo.THour_Data_View h
        INNER JOIN dbo.TEmployee_Details e ON e.ID = h.Employee_ID_FK
        WHERE h.Grower_ID = @growerId
-         AND h.Work_Date >= @since
+         AND h.Work_Date >= CONVERT(datetime2, @since, 121)
        GROUP BY e.ID, e.EmplNo, e.FirstName, e.LastName, e.knownAs
        ORDER BY daysWorked DESC`,
       { growerId, since }
@@ -57,8 +57,8 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
   async findAllWithFilters(params: {
     growerId?: number;
     status?: string;
-    rangeStart?: Date;
-    rangeEnd?: Date;
+    rangeStart?: Date | string;
+    rangeEnd?: Date | string;
   }): Promise<ScheduleWithGrower[]> {
     let sql = `
       SELECT s.ID, s.Grower_ID, s.Start_Date, s.End_Date, s.Default_Hours, s.Status,
@@ -80,9 +80,10 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
       qparams.status = params.status;
     }
     if (params.rangeStart && params.rangeEnd) {
-      sql += ` AND s.Start_Date <= @rangeEnd AND s.End_Date >= @rangeStart`;
-      qparams.rangeStart = params.rangeStart;
-      qparams.rangeEnd = params.rangeEnd;
+      sql += ` AND s.Start_Date <= CONVERT(date, @rangeEnd, 23)
+               AND s.End_Date >= CONVERT(date, @rangeStart, 23)`;
+      qparams.rangeStart = this.normalizeDateOnly(params.rangeStart);
+      qparams.rangeEnd = this.normalizeDateOnly(params.rangeEnd);
     }
 
     sql += ` ORDER BY s.Start_Date DESC, s.ID DESC`;
@@ -126,8 +127,8 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
   }
 
   async createSchedule(input: CreateScheduleInput): Promise<number> {
-    const start = this.normalizeDateToUTC(input.Start_Date);
-    const end = this.normalizeDateToUTC(input.End_Date);
+    const start = this.normalizeDateOnly(input.Start_Date);
+    const end = this.normalizeDateOnly(input.End_Date);
     if (end < start) {
       throw new Error('End date must be on or after start date');
     }
@@ -145,7 +146,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
        INSERT INTO dbo.TSchedule (Grower_ID, Start_Date, End_Date, Default_Hours, Status, Created_At, Updated_At)
        OUTPUT INSERTED.ID INTO @insertedSchedule
-       VALUES (@growerId, @startDate, @endDate, @defaultHours, @status, SYSDATETIME(), SYSDATETIME());
+       VALUES (@growerId, CONVERT(date, @startDate, 23), CONVERT(date, @endDate, 23), @defaultHours, @status, ${SQL_SOUTH_AFRICA_NOW}, ${SQL_SOUTH_AFRICA_NOW});
 
        DECLARE @scheduleId INT = (SELECT TOP 1 ID FROM @insertedSchedule);
 
@@ -159,7 +160,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
          FROM OPENJSON(@workDatesJson)
        )
        INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
-       SELECT @scheduleId, Employee_ID, SYSDATETIME()
+       SELECT @scheduleId, Employee_ID, ${SQL_SOUTH_AFRICA_NOW}
        FROM EmployeeIds;
 
        ;WITH EmployeeIds AS (
@@ -213,15 +214,15 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
       }
       if (input.status != null) {
         await this.executeQuery(
-          `UPDATE dbo.TSchedule SET Status = @status, Updated_At = SYSDATETIME() WHERE ID = @id`,
+          `UPDATE dbo.TSchedule SET Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW} WHERE ID = @id`,
           { id, status: input.status }
         );
       }
       return;
     }
 
-    const start = input.Start_Date ? this.normalizeDateToUTC(input.Start_Date) : new Date(current.Start_Date);
-    const end = input.End_Date ? this.normalizeDateToUTC(input.End_Date) : new Date(current.End_Date);
+    const start = input.Start_Date ? this.normalizeDateOnly(input.Start_Date) : this.normalizeDateOnly(current.Start_Date);
+    const end = input.End_Date ? this.normalizeDateOnly(input.End_Date) : this.normalizeDateOnly(current.End_Date);
     if (end < start) throw new Error('End date must be on or after start date');
     const status = input.status ?? current.Status;
 
@@ -238,7 +239,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
       await this.executeQuery(
         `UPDATE dbo.TSchedule
-         SET Start_Date = @startDate, End_Date = @endDate, Default_Hours = @defaultHours, Status = @status, Updated_At = SYSDATETIME()
+         SET Start_Date = CONVERT(date, @startDate, 23), End_Date = CONVERT(date, @endDate, 23), Default_Hours = @defaultHours, Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW}
          WHERE ID = @id`,
         { id, startDate: start, endDate: end, defaultHours, status }
       );
@@ -247,10 +248,10 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
       return;
     }
 
-    const currentStart = new Date(current.Start_Date);
-    const currentEnd = new Date(current.End_Date);
+    const currentStart = this.normalizeDateOnly(current.Start_Date);
+    const currentEnd = this.normalizeDateOnly(current.End_Date);
     const datesChanged =
-      start.getTime() !== currentStart.getTime() || end.getTime() !== currentEnd.getTime();
+      start !== currentStart || end !== currentEnd;
 
     if (datesChanged) {
       const empRows = await this.executeQuery<{ Employee_ID: number }>(
@@ -261,7 +262,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
       await this.executeQuery(`DELETE FROM dbo.TScheduleAttendance WHERE Schedule_ID = @id`, { id });
       await this.executeQuery(
         `UPDATE dbo.TSchedule
-         SET Start_Date = @startDate, End_Date = @endDate, Status = @status, Updated_At = SYSDATETIME()
+         SET Start_Date = CONVERT(date, @startDate, 23), End_Date = CONVERT(date, @endDate, 23), Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW}
          WHERE ID = @id`,
         { id, startDate: start, endDate: end, status }
       );
@@ -271,7 +272,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
     await this.executeQuery(
       `UPDATE dbo.TSchedule
-       SET Start_Date = @startDate, End_Date = @endDate, Status = @status, Updated_At = SYSDATETIME()
+       SET Start_Date = CONVERT(date, @startDate, 23), End_Date = CONVERT(date, @endDate, 23), Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW}
        WHERE ID = @id`,
       { id, startDate: start, endDate: end, status }
     );
@@ -299,7 +300,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
   async setStatus(id: number, status: Schedule['Status']): Promise<void> {
     await this.executeQuery(
-      `UPDATE dbo.TSchedule SET Status = @status, Updated_At = SYSDATETIME() WHERE ID = @id`,
+      `UPDATE dbo.TSchedule SET Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW} WHERE ID = @id`,
       { id, status }
     );
   }
@@ -307,8 +308,8 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
   private async insertRosterAndAttendance(
     scheduleId: number,
     employeeIds: number[],
-    start: Date,
-    end: Date
+    start: string,
+    end: string
   ): Promise<void> {
     await this.executeQuery(
       `;WITH EmployeeIds AS (
@@ -321,7 +322,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
          FROM OPENJSON(@workDatesJson)
        )
        INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
-       SELECT @scheduleId, Employee_ID, SYSDATETIME()
+       SELECT @scheduleId, Employee_ID, ${SQL_SOUTH_AFRICA_NOW}
        FROM EmployeeIds;
 
        ;WITH EmployeeIds AS (
@@ -349,8 +350,8 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
   private async insertAttendanceRows(
     scheduleId: number,
     employeeIds: number[],
-    start: Date,
-    end: Date
+    start: string,
+    end: string
   ): Promise<void> {
     await this.executeQuery(
       `;WITH EmployeeIds AS (
@@ -398,10 +399,10 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
     // Add to roster
     // Determine date range for attendance records
-    const startDate = this.normalizeDateToUTC(input.startDate);
-    const scheduleEnd = new Date(schedule.End_Date);
+    const startDate = this.normalizeDateOnly(input.startDate);
+    const scheduleEnd = this.normalizeDateOnly(schedule.End_Date);
     
-    let endDate: Date;
+    let endDate: string;
     if (input.endDateOption === 'single') {
       endDate = startDate;
     } else {

@@ -1,5 +1,6 @@
 import { BaseDAO } from './base-dao';
 import { Employee } from '@/types/database';
+import { toSqlDateOnly } from '@/lib/date-time/south-africa';
 
 interface EmployeeWithLastWorked extends Employee {
   lastWorkedDate: Date | null;
@@ -9,6 +10,10 @@ interface EmployeeWithLastWorked extends Employee {
 export class EmployeeDAO extends BaseDAO<Employee> {
   constructor() {
     super('dbo.TEmployee_Details');
+  }
+
+  private formatSQLDate(date: Date | string | null | undefined): string | null {
+    return toSqlDateOnly(date);
   }
 
   async findAll(): Promise<Employee[]> {
@@ -79,7 +84,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
           RATE, IDNumber, DateEngaged
         ) VALUES (
           @emplNo, @lastName, @firstName, @knownAs,
-          @rate, @idNumber, @dateEngaged
+          @rate, @idNumber, CONVERT(date, @dateEngaged, 23)
         );
         SELECT SCOPE_IDENTITY() as ID;`,
         {
@@ -89,7 +94,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
           knownAs: employee.knownAs,
           rate: employee.RATE,
           idNumber: employee.IDNumber,
-          dateEngaged: employee.DateEngaged
+          dateEngaged: this.formatSQLDate(employee.DateEngaged)
         }
       );
 
@@ -110,15 +115,24 @@ export class EmployeeDAO extends BaseDAO<Employee> {
       console.log('Updating employee:', { id, ...employee });
       const updates = Object.entries(employee)
         .filter(([key]) => key !== 'ID')
-        .map(([key]) => `${key} = @${key}`)
+        .map(([key]) => (
+          key === 'DateEngaged'
+            ? `${key} = CONVERT(date, @${key}, 23)`
+            : `${key} = @${key}`
+        ))
         .join(', ');
+
+      const normalizedEmployee = {
+        ...employee,
+        DateEngaged: employee.DateEngaged ? this.formatSQLDate(employee.DateEngaged) : employee.DateEngaged,
+      };
 
       await this.executeQuery(
         `UPDATE ${this.tableName} 
          SET ${updates}
          WHERE ID = @id`,
         {
-          ...employee,
+          ...normalizedEmployee,
           id
         }
       );
@@ -131,7 +145,7 @@ export class EmployeeDAO extends BaseDAO<Employee> {
 
   async getEmployeesByGrowerAndDate(
     growerId: number,
-    date: Date
+    date: Date | string
   ): Promise<Employee[]> {
     try {
       console.log('Getting employees by grower and date:', { growerId, date });
@@ -140,9 +154,9 @@ export class EmployeeDAO extends BaseDAO<Employee> {
          FROM ${this.tableName} e
          INNER JOIN dbo.THour_Data_View h ON e.ID = h.Employee_ID_FK
          WHERE h.Grower_ID = @growerId 
-         AND CAST(h.Work_Date AS DATE) = CAST(@date AS DATE)
+         AND CAST(h.Work_Date AS DATE) = CONVERT(date, @date, 23)
          ORDER BY e.LastName, e.FirstName`,
-        { growerId, date }
+        { growerId, date: this.formatSQLDate(date) }
       );
       console.log(`Found ${result.length} employees for grower ${growerId} on date ${date}`);
       return result;

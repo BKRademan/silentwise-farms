@@ -4,6 +4,7 @@ import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { Employee } from '@/types/database';
 import { NextResponse } from 'next/server';
 import { HoursDAO } from '@/lib/db/hours-dao';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 export async function GET() {
   try {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       knownAs: body.knownAs || null,
       RATE: body.RATE || null,
       IDNumber: body.IDNumber || null,
-      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : null,
+      DateEngaged: body.DateEngaged ? requireSouthAfricaDateOnly(body.DateEngaged, 'DateEngaged') : null,
       BankName: body.BankName || null,
       BranchCode: body.BranchCode || null,
       AccHolder: body.AccHolder || null,
@@ -62,7 +63,7 @@ export async function PUT(request: NextRequest) {
       knownAs: body.knownAs,
       RATE: body.RATE,
       IDNumber: body.IDNumber,
-      DateEngaged: body.DateEngaged ? new Date(body.DateEngaged) : undefined,
+      DateEngaged: body.DateEngaged ? requireSouthAfricaDateOnly(body.DateEngaged, 'DateEngaged') : undefined,
       BankName: body.BankName,
       BranchCode: body.BranchCode,
       AccHolder: body.AccHolder,

@@ -1,40 +1,35 @@
 import { BaseDAO } from './base-dao';
 import { HourRecord } from '@/types/database';
-import { format } from 'date-fns';
+import { addDaysToDateOnly, toSouthAfricaDateOnly, toSqlDateTimeStartOfDay } from '@/lib/date-time/south-africa';
 
 export class HoursDAO extends BaseDAO<HourRecord> {
   constructor() {
     super('dbo.THour_Data_View');
   }
 
-  private formatSQLDate(date: Date): string {
-    // Create a new date object to avoid modifying the original
-    const localDate = new Date(date);
-    
-    // Adjust the date to local midnight
-    localDate.setHours(0, 0, 0, 0);
-    
-    // Convert local midnight to UTC for SQL Server
-    const year = localDate.getFullYear();
-    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getDate()).padStart(2, '0');
-    
-    // Format as YYYY-MM-DD 00:00:00
-    const formatted = `${year}-${month}-${day} 00:00:00.000`;
-    console.log('Formatting date:', { original: date, localDate, formatted });
+  private formatSQLDate(date: Date | string | null | undefined): string | null {
+    const formatted = toSqlDateTimeStartOfDay(date);
+    console.log('Formatting SA date:', { original: date, formatted });
     return formatted;
   }
 
-  async getHoursByDateRange(start: Date, end: Date): Promise<HourRecord[]> {
+  private formatExclusiveEndDate(date: Date | string): string {
+    const dateOnly = toSouthAfricaDateOnly(date);
+    if (!dateOnly) throw new Error('End date is required');
+    return `${addDaysToDateOnly(dateOnly, 1)} 00:00:00.000`;
+  }
+
+  async getHoursByDateRange(start: Date | string, end: Date | string): Promise<HourRecord[]> {
     console.log('Querying hours between:', { start, end });
     try {
       const result = await this.executeQuery<HourRecord>(
         `SELECT * FROM ${this.tableName} 
-         WHERE Work_Date >= @start AND Work_Date < @end
+         WHERE Work_Date >= CONVERT(datetime2, @start, 121)
+           AND Work_Date < CONVERT(datetime2, @end, 121)
          ORDER BY Work_Date DESC`,
         { 
-          start: start.toISOString(),
-          end: end.toISOString()
+          start: this.formatSQLDate(start),
+          end: this.formatExclusiveEndDate(end)
         }
       );
       return result;
@@ -63,20 +58,21 @@ export class HoursDAO extends BaseDAO<HourRecord> {
 
   async getHoursByEmployeeAndDate(
     employeeId: number,
-    startDate: Date,
-    endDate: Date
+    startDate: Date | string,
+    endDate: Date | string
   ): Promise<HourRecord[]> {
     console.log('Getting hours by employee and date:', { employeeId, startDate, endDate });
     try {
       const result = await this.executeQuery<HourRecord>(
         `SELECT * FROM ${this.tableName} 
          WHERE Employee_ID_FK = @employeeId 
-         AND Work_Date >= @startDate AND Work_Date < @endDate
+         AND Work_Date >= CONVERT(datetime2, @startDate, 121)
+         AND Work_Date < CONVERT(datetime2, @endDate, 121)
          ORDER BY Work_Date DESC`,
         { 
           employeeId,
           startDate: this.formatSQLDate(startDate),
-          endDate: this.formatSQLDate(endDate)
+          endDate: this.formatExclusiveEndDate(endDate)
         }
       );
       console.log(`Found ${result.length} records for employee ${employeeId} in date range`);
@@ -89,20 +85,21 @@ export class HoursDAO extends BaseDAO<HourRecord> {
 
   async getHoursByGrowerAndDate(
     growerId: number,
-    startDate: Date,
-    endDate: Date
+    startDate: Date | string,
+    endDate: Date | string
   ): Promise<HourRecord[]> {
     console.log('Getting hours by grower and date:', { growerId, startDate, endDate });
     try {
       const result = await this.executeQuery<HourRecord>(
         `SELECT * FROM ${this.tableName} 
          WHERE Grower_ID = @growerId 
-         AND Work_Date >= @startDate AND Work_Date < @endDate
+         AND Work_Date >= CONVERT(datetime2, @startDate, 121)
+         AND Work_Date < CONVERT(datetime2, @endDate, 121)
          ORDER BY Work_Date DESC`,
         { 
           growerId,
           startDate: this.formatSQLDate(startDate),
-          endDate: this.formatSQLDate(endDate)
+          endDate: this.formatExclusiveEndDate(endDate)
         }
       );
       console.log(`Found ${result.length} records for grower ${growerId} in date range`);
@@ -116,8 +113,8 @@ export class HoursDAO extends BaseDAO<HourRecord> {
   async getHoursByGrowerEmployeeAndDate(
     growerId: number,
     employeeId: number,
-    startDate: Date,
-    endDate: Date
+    startDate: Date | string,
+    endDate: Date | string
   ): Promise<HourRecord[]> {
     console.log('Getting hours by grower, employee and date:', { 
       growerId, employeeId, startDate, endDate 
@@ -127,13 +124,14 @@ export class HoursDAO extends BaseDAO<HourRecord> {
         `SELECT * FROM ${this.tableName} 
          WHERE Grower_ID = @growerId 
          AND Employee_ID_FK = @employeeId
-         AND Work_Date >= @startDate AND Work_Date < @endDate
+         AND Work_Date >= CONVERT(datetime2, @startDate, 121)
+         AND Work_Date < CONVERT(datetime2, @endDate, 121)
          ORDER BY Work_Date DESC`,
         { 
           growerId,
           employeeId,
           startDate: this.formatSQLDate(startDate),
-          endDate: this.formatSQLDate(endDate)
+          endDate: this.formatExclusiveEndDate(endDate)
         }
       );
       console.log(`Found ${result.length} records for grower ${growerId} and employee ${employeeId} in date range`);
@@ -227,7 +225,7 @@ export class HoursDAO extends BaseDAO<HourRecord> {
           Con_Tot, 
           Man_Fee
         ) VALUES (
-          @workDate,
+          CONVERT(datetime2, @workDate, 121),
           @hoursWorked,
           @employeeId,
           @growerId,
@@ -276,17 +274,26 @@ export class HoursDAO extends BaseDAO<HourRecord> {
     try {
       const updates = Object.entries(record)
         .filter(([key]) => key !== 'ID')
-        .map(([key]) => `${key} = @${key}`)
+        .map(([key]) => (
+          key === 'Work_Date'
+            ? `${key} = CONVERT(datetime2, @${key}, 121)`
+            : `${key} = @${key}`
+        ))
         .join(', ');
 
       console.log('Generated update SQL:', updates);
+
+      const normalizedRecord = {
+        ...record,
+        Work_Date: record.Work_Date ? this.formatSQLDate(record.Work_Date) : record.Work_Date,
+      };
 
       await this.executeQuery(
         `UPDATE dbo.THours 
          SET ${updates}
          WHERE ID = @id`,
         {
-          ...record,
+          ...normalizedRecord,
           id
         }
       );
@@ -311,7 +318,7 @@ export class HoursDAO extends BaseDAO<HourRecord> {
     }
   }
 
-  async checkEmployeeRecordExists(employeeId: number, workDate: Date, recordId?: number): Promise<boolean> {
+  async checkEmployeeRecordExists(employeeId: number, workDate: Date | string, recordId?: number): Promise<boolean> {
     console.log('Checking if employee record exists:', { employeeId, workDate, recordId });
     try {
       // Format the date for SQL query
@@ -322,7 +329,7 @@ export class HoursDAO extends BaseDAO<HourRecord> {
         SELECT COUNT(*) as count 
         FROM dbo.THours 
         WHERE Employee_ID_FK = @employeeId 
-        AND CONVERT(date, Work_Date) = CONVERT(date, @workDate)`;
+        AND CONVERT(date, Work_Date) = CONVERT(date, @workDate, 121)`;
       
       const params: any = { 
         employeeId, 
@@ -338,7 +345,7 @@ export class HoursDAO extends BaseDAO<HourRecord> {
       const result = await this.executeQuery<{ count: number }>(query, params);
       
       const exists = result[0]?.count > 0;
-      console.log(`Employee ${employeeId} record on ${workDate.toISOString()} exists: ${exists}`);
+      console.log(`Employee ${employeeId} record on ${formattedDate} exists: ${exists}`);
       return exists;
     } catch (error) {
       console.error('Error checking if employee record exists:', error);

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { DeductionsDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
 import { Deduction } from '@/types/database';
+import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const deductionsDao = new DeductionsDAO();
 
@@ -17,8 +18,8 @@ export async function GET(request: NextRequest) {
       if (startDate && endDate) {
         return deductionsDao.getDeductionSummaryByEmployee(
           employeeId,
-          new Date(startDate),
-          new Date(endDate)
+          requireSouthAfricaDateOnly(startDate, 'startDate'),
+          requireSouthAfricaDateOnly(endDate, 'endDate')
         );
       }
       return deductionsDao.getDeductionsByEmployee(employeeId);
@@ -26,8 +27,8 @@ export async function GET(request: NextRequest) {
 
     if (startDate && endDate) {
       return deductionsDao.getDeductionsByDateRange(
-        new Date(startDate),
-        new Date(endDate)
+        requireSouthAfricaDateOnly(startDate, 'startDate'),
+        requireSouthAfricaDateOnly(endDate, 'endDate')
       );
     }
 
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     const deduction: Omit<Deduction, 'ID'> = {
       Loans: body.Loans || null,
       PPE: body.PPE || null,
-      Date: new Date(body.Date),
+      Date: requireSouthAfricaDateOnly(body.Date, 'Date'),
       FK_Emp_ID: body.FK_Emp_ID,
       FK_PPE_Item: body.FK_PPE_Item || null
     };
@@ -70,7 +71,7 @@ export async function PUT(request: NextRequest) {
     const updates: Partial<Deduction> = {
       Loans: body.Loans,
       PPE: body.PPE,
-      Date: body.Date ? new Date(body.Date) : undefined,
+      Date: body.Date ? requireSouthAfricaDateOnly(body.Date, 'Date') : undefined,
       FK_Emp_ID: body.FK_Emp_ID,
       FK_PPE_Item: body.FK_PPE_Item
     };
