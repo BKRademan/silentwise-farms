@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Truck, Clock, Shield, Beaker, Users } from 'lucide-react';
+import { Menu, X, Home, Truck, Clock, Shield, Beaker, Users, CalendarDays } from 'lucide-react';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -13,6 +13,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Hours', href: '/hours', icon: Clock },
+  { name: 'Schedules', href: '/schedules', icon: CalendarDays },
   { name: 'Transport', href: '/transport', icon: Truck },
   { name: 'PPE', href: '/ppe', icon: Shield },
   { name: 'Test', href: '/test', icon: Beaker },
@@ -49,19 +50,23 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 <nav className="px-2 space-y-1">
                   {navigation.map((item) => {
                     const Icon = item.icon;
+                    const isActive =
+                      item.href === '/schedules'
+                        ? pathname.startsWith('/schedules')
+                        : pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={`group flex items-center px-2 py-2 text-base font-medium rounded-md ${
-                          pathname === item.href
+                          isActive
                             ? 'bg-gray-100 text-gray-900'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                         }`}
                       >
                         <Icon className={`mr-3 h-6 w-6 flex-shrink-0 ${
-                          pathname === item.href
+                          isActive
                             ? item.name === 'Hours'
                               ? 'text-blue-500'
                               : item.name === 'Transport'
@@ -70,6 +75,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                               ? 'text-green-500'
                               : item.name === 'Dashboard'
                               ? 'text-purple-500'
+                              : item.name === 'Schedules'
+                              ? 'text-teal-600'
                               : 'text-gray-900'
                             : 'text-gray-400 group-hover:text-gray-500'
                         }`} />
@@ -94,18 +101,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <nav className="mt-5 flex-1 space-y-1 bg-white px-2">
               {navigation.map((item) => {
                 const Icon = item.icon;
+                const isActive =
+                  item.href === '/schedules'
+                    ? pathname.startsWith('/schedules')
+                    : pathname === item.href;
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
                     className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                      pathname === item.href
+                      isActive
                         ? 'bg-gray-100 text-gray-900'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
                     <Icon className={`mr-3 h-6 w-6 flex-shrink-0 ${
-                      pathname === item.href
+                      isActive
                         ? item.name === 'Hours'
                           ? 'text-blue-500'
                           : item.name === 'Transport'
@@ -114,6 +125,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           ? 'text-green-500'
                           : item.name === 'Dashboard'
                           ? 'text-purple-500'
+                          : item.name === 'Schedules'
+                          ? 'text-teal-600'
                           : 'text-gray-900'
                         : 'text-gray-400 group-hover:text-gray-500'
                     }`} />

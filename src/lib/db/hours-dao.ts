@@ -184,7 +184,11 @@ export class HoursDAO extends BaseDAO<HourRecord> {
       const emp_rate = employeeRate[0]?.RATE || null;
       const man_fee = growerDetails[0]?.HasManFee ? (growerDetails[0]?.ManFee || null) : null;
       const con_tot = growerDetails[0]?.ContPerc || null;
-      const hours_worked = record.Hours_Worked || growerDetails[0]?.HrsPerDay || null;
+      // Use nullish coalescing so 0 is a valid value (e.g. sick/PH-only rows)
+      const hours_worked =
+        record.Hours_Worked !== undefined && record.Hours_Worked !== null
+          ? record.Hours_Worked
+          : growerDetails[0]?.HrsPerDay ?? null;
 
       console.log('Calculated values:', {
         emp_rate,

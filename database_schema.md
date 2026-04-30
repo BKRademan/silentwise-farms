@@ -30,9 +30,25 @@ Hours tracking table that stores employee work hours.
 | Con_Tot         | float           | null          | Total contribution                            |
 | Man_Fee         | float           | null          | Management fee                                |
 | Sick_Leave      | float           | null          | Sick leave hours                              |
+| Overtime        | float           | null          | Overtime hours                                |
 
+### dbo.TSchedule
+Schedule header (grower + date range). Create via `database/schedule_tables.sql`.
 
-### dbo.TPPE_Items
+| Column | Type | Description |
+|--------|------|-------------|
+| ID | int PK | Identity |
+| Grower_ID | int FK | TGrowers |
+| Start_Date / End_Date | date | Selected period |
+| Default_Hours | decimal | Snapshot from grower HrsPerDay |
+| Status | nvarchar | draft / active / completed |
+| Created_At / Updated_At | datetime2 | Audit |
+
+### dbo.TScheduleEmployee
+Roster lines linking employees to a schedule.
+
+### dbo.TScheduleAttendance
+One row per employee per work day; `Status` null = not marked. Links to `THours` via `Hour_Record_ID` when present/PH/sick/OT.
 PPE (Personal Protective Equipment) items reference table.
 
 | Column | Type | Nullable | Description |

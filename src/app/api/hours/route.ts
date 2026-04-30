@@ -66,7 +66,13 @@ export async function POST(request: NextRequest) {
   return handleApiRoute(async () => {
     const body = await request.json();
     
-    if (!body.Work_Date || !body.Hours_Worked || !body.Employee_ID_FK || !body.Grower_ID) {
+    if (
+      !body.Work_Date ||
+      body.Hours_Worked === undefined ||
+      body.Hours_Worked === null ||
+      !body.Employee_ID_FK ||
+      !body.Grower_ID
+    ) {
       throw new ValidationError('Missing required fields');
     }
 
