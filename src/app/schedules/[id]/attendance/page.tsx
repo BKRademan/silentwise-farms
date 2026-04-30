@@ -626,19 +626,32 @@ export default function ScheduleAttendancePage() {
           <span className="text-muted-foreground">· {summary.total} rostered</span>
 
           {pendingCount > 0 && (
-            <Button
-              size="sm"
-              onClick={handleSync}
-              disabled={syncing}
-              className="ml-2"
-            >
-              {syncing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="mr-2 h-4 w-4" />
-              )}
-              Save {pendingCount} change{pendingCount === 1 ? '' : 's'}
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  clearAll();
+                  toast({ title: 'Pending attendance changes discarded' });
+                }}
+                disabled={syncing}
+                className="ml-2"
+              >
+                Discard changes
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSync}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                Save {pendingCount} change{pendingCount === 1 ? '' : 's'}
+              </Button>
+            </>
           )}
         </div>
       </div>

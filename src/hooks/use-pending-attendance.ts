@@ -47,6 +47,14 @@ function writeToStorage(scheduleId: number, map: PendingMap) {
   }
 }
 
+export function getPendingAttendanceCount(scheduleId: number): number {
+  return Object.keys(readFromStorage(scheduleId)).length;
+}
+
+export function clearPendingAttendance(scheduleId: number): void {
+  writeToStorage(scheduleId, {});
+}
+
 export function usePendingAttendance(scheduleId: number) {
   const [pending, setPending] = useState<PendingMap>(() =>
     readFromStorage(scheduleId)
@@ -88,8 +96,9 @@ export function usePendingAttendance(scheduleId: number) {
   );
 
   const clearAll = useCallback(() => {
+    clearPendingAttendance(scheduleId);
     setPending({});
-  }, []);
+  }, [scheduleId]);
 
   const getPendingMark = useCallback(
     (employeeId: number, workDate: string): PendingMark | undefined => {

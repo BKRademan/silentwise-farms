@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Plus, CalendarRange, Trash2, CheckCircle2, Pencil, Undo2 } from 'lucide-react';
 import type { ScheduleWithGrower } from '@/types/schedule';
 import { useToast } from '@/components/ui/use-toast';
+import { getPendingAttendanceCount } from '@/hooks/use-pending-attendance';
 import {
   Dialog,
   DialogContent,
@@ -124,6 +125,16 @@ export default function SchedulesPage() {
   };
 
   const handleSetDraft = async (id: number) => {
+    const pendingCount = getPendingAttendanceCount(id);
+    if (pendingCount > 0) {
+      toast({
+        title: 'Unsaved attendance changes',
+        description: `This schedule has ${pendingCount} unsaved attendance change${pendingCount === 1 ? '' : 's'} on this device. Open attendance to save or discard them before setting it back to draft.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/schedules/${id}`, {
         method: 'PATCH',
