@@ -299,6 +299,20 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
   }
 
   async setStatus(id: number, status: Schedule['Status']): Promise<void> {
+    const current = await this.findById(id);
+    if (!current) throw new Error('Schedule not found');
+
+    if (current.Status === 'completed' && status !== 'completed') {
+      throw new Error('Completed schedules cannot be reopened.');
+    }
+
+    if (current.Status === 'active' && status === 'draft') {
+      const marked = await this.countMarkedAttendance(id);
+      if (marked > 0) {
+        throw new Error('Cannot set schedule back to draft while attendance has been marked.');
+      }
+    }
+
     await this.executeQuery(
       `UPDATE dbo.TSchedule SET Status = @status, Updated_At = ${SQL_SOUTH_AFRICA_NOW} WHERE ID = @id`,
       { id, status }

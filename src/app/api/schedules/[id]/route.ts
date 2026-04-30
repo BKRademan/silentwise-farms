@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server';
 import { ScheduleDAO } from '@/lib/db';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
-import { UpdateScheduleInput } from '@/types/schedule';
+import { ScheduleStatus, UpdateScheduleInput } from '@/types/schedule';
 import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
 
 const scheduleDao = new ScheduleDAO();
+const validStatuses = new Set<ScheduleStatus>(['draft', 'active', 'completed']);
 
 type RouteContext = { params: { id: string } };
 
@@ -42,6 +43,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (Number.isNaN(id)) throw new ValidationError('Invalid id');
     const body = await request.json();
     if (!body.status) throw new ValidationError('Status is required');
+    if (!validStatuses.has(body.status)) throw new ValidationError('Invalid status');
 
     if (body.status === 'completed' && !body.force) {
       const unmarked = await scheduleDao.getUnmarkedCount(id);

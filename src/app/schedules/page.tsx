@@ -8,7 +8,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, CalendarRange, Trash2, CheckCircle2, Pencil } from 'lucide-react';
+import { Loader2, Plus, CalendarRange, Trash2, CheckCircle2, Pencil, Undo2 } from 'lucide-react';
 import type { ScheduleWithGrower } from '@/types/schedule';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -118,6 +118,26 @@ export default function SchedulesPage() {
     } catch (err) {
       toast({
         title: err instanceof Error ? err.message : 'Failed to complete schedule',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSetDraft = async (id: number) => {
+    try {
+      const res = await fetch(`/api/schedules/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'draft' }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to set schedule back to draft');
+
+      toast({ title: 'Schedule set back to draft' });
+      load();
+    } catch (err) {
+      toast({
+        title: err instanceof Error ? err.message : 'Failed to set schedule back to draft',
         variant: 'destructive',
       });
     }
@@ -243,14 +263,24 @@ export default function SchedulesPage() {
                     <Link href={`/schedules/${s.ID}/attendance`}>Attendance</Link>
                   </Button>
                   {s.Status === 'active' && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleComplete(s.ID, s.GrowerName)}
-                    >
-                      <CheckCircle2 className="mr-1 h-4 w-4" />
-                      Complete
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSetDraft(s.ID)}
+                      >
+                        <Undo2 className="mr-1 h-4 w-4" />
+                        Draft
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleComplete(s.ID, s.GrowerName)}
+                      >
+                        <CheckCircle2 className="mr-1 h-4 w-4" />
+                        Complete
+                      </Button>
+                    </>
                   )}
                   {s.Status === 'draft' && (
                     <>
