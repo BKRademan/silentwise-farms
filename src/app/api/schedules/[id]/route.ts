@@ -54,6 +54,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
+    if (body.status === 'draft') {
+      const detail = await scheduleDao.findDetailById(id);
+      if (!detail) throw new ValidationError('Schedule not found');
+      if (detail.Status === 'completed') {
+        throw new ValidationError('Completed schedules cannot be set back to draft.');
+      }
+
+      const marked = await scheduleDao.countMarkedAttendance(id);
+      if (marked > 0) {
+        throw new ValidationError(
+          `Cannot set schedule back to draft: ${marked} attendance slot${marked === 1 ? ' is' : 's are'} already marked. Unmark saved attendance first.`
+        );
+      }
+    }
+
     await scheduleDao.setStatus(id, body.status);
     return { message: 'Schedule status updated' };
   });
