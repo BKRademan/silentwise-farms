@@ -175,17 +175,22 @@ export function ScheduleForm({ scheduleId, initialData }: ScheduleFormProps) {
 
       <div className="space-y-2">
         <Label>Grower</Label>
-        <Combobox
-          options={growerOptions}
-          value={growerId}
-          onValueChange={setGrowerId}
-          placeholder="Select grower..."
-          disabled={!!scheduleId}
-        />
-        {scheduleId && (
-          <p className="text-xs text-muted-foreground">
-            Cannot change grower for existing schedule
-          </p>
+        {scheduleId ? (
+          <>
+            <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm">
+              {growerOptions.find(g => g.value === growerId)?.label || 'Select grower...'}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cannot change grower for existing schedule
+            </p>
+          </>
+        ) : (
+          <Combobox
+            options={growerOptions}
+            value={growerId}
+            onValueChange={setGrowerId}
+            placeholder="Select grower..."
+          />
         )}
       </div>
 
