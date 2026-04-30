@@ -23,6 +23,15 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
     return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   }
 
+  private dateRangeJson(start: Date, end: Date): string {
+    return JSON.stringify(
+      eachDayOfInterval({ start, end }).map((day) => {
+        const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
+        return normalizedDay.toISOString().slice(0, 10);
+      })
+    );
+  }
+
   async findRecentEmployeesForGrower(
     growerId: number,
     daysBack = 60
@@ -132,42 +141,55 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
     const status = input.status ?? 'draft';
 
     const inserted = await this.executeQuery<{ ID: number }>(
-      `INSERT INTO dbo.TSchedule (Grower_ID, Start_Date, End_Date, Default_Hours, Status, Created_At, Updated_At)
-       OUTPUT INSERTED.ID
-       VALUES (@growerId, @startDate, @endDate, @defaultHours, @status, SYSDATETIME(), SYSDATETIME())`,
+      `DECLARE @insertedSchedule TABLE (ID INT);
+
+       INSERT INTO dbo.TSchedule (Grower_ID, Start_Date, End_Date, Default_Hours, Status, Created_At, Updated_At)
+       OUTPUT INSERTED.ID INTO @insertedSchedule
+       VALUES (@growerId, @startDate, @endDate, @defaultHours, @status, SYSDATETIME(), SYSDATETIME());
+
+       DECLARE @scheduleId INT = (SELECT TOP 1 ID FROM @insertedSchedule);
+
+       ;WITH EmployeeIds AS (
+         SELECT DISTINCT TRY_CONVERT(INT, [value]) AS Employee_ID
+         FROM OPENJSON(@employeeIdsJson)
+         WHERE TRY_CONVERT(INT, [value]) IS NOT NULL
+       ),
+       WorkDates AS (
+         SELECT CONVERT(DATE, [value]) AS Work_Date
+         FROM OPENJSON(@workDatesJson)
+       )
+       INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
+       SELECT @scheduleId, Employee_ID, SYSDATETIME()
+       FROM EmployeeIds;
+
+       ;WITH EmployeeIds AS (
+         SELECT DISTINCT TRY_CONVERT(INT, [value]) AS Employee_ID
+         FROM OPENJSON(@employeeIdsJson)
+         WHERE TRY_CONVERT(INT, [value]) IS NOT NULL
+       ),
+       WorkDates AS (
+         SELECT CONVERT(DATE, [value]) AS Work_Date
+         FROM OPENJSON(@workDatesJson)
+       )
+       INSERT INTO dbo.TScheduleAttendance
+         (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
+       SELECT @scheduleId, e.Employee_ID, d.Work_Date, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+       FROM EmployeeIds e
+       CROSS JOIN WorkDates d;
+
+       SELECT @scheduleId AS ID;`,
       {
         growerId: input.Grower_ID,
         startDate: start,
         endDate: end,
         defaultHours,
         status,
+        employeeIdsJson: JSON.stringify(Array.from(new Set(input.employeeIds))),
+        workDatesJson: this.dateRangeJson(start, end),
       }
     );
 
     const scheduleId = inserted[0].ID;
-    const employeeIds = Array.from(new Set(input.employeeIds));
-
-    for (const empId of employeeIds) {
-      await this.executeQuery(
-        `INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
-         VALUES (@scheduleId, @empId, SYSDATETIME())`,
-        { scheduleId, empId }
-      );
-    }
-
-    const days = eachDayOfInterval({ start, end });
-    for (const day of days) {
-      const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-      for (const empId of employeeIds) {
-        await this.executeQuery(
-          `INSERT INTO dbo.TScheduleAttendance
-           (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
-           VALUES (@scheduleId, @empId, @workDate, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`,
-          { scheduleId, empId, workDate: normalizedDay }
-        );
-      }
-    }
-
     return scheduleId;
   }
 
@@ -221,26 +243,7 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
         { id, startDate: start, endDate: end, defaultHours, status }
       );
 
-      for (const empId of employeeIds) {
-        await this.executeQuery(
-          `INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
-           VALUES (@id, @empId, SYSUTCDATETIME())`,
-          { id, empId }
-        );
-      }
-
-      const days = eachDayOfInterval({ start, end });
-      for (const day of days) {
-        const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-        for (const empId of employeeIds) {
-          await this.executeQuery(
-            `INSERT INTO dbo.TScheduleAttendance
-             (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
-             VALUES (@id, @empId, @workDate, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`,
-            { id, empId, workDate: normalizedDay }
-          );
-        }
-      }
+      await this.insertRosterAndAttendance(id, employeeIds, start, end);
       return;
     }
 
@@ -262,24 +265,13 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
          WHERE ID = @id`,
         { id, startDate: start, endDate: end, status }
       );
-      const days = eachDayOfInterval({ start, end });
-      for (const day of days) {
-        const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-        for (const empId of employeeIds) {
-          await this.executeQuery(
-            `INSERT INTO dbo.TScheduleAttendance
-             (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
-             VALUES (@id, @empId, @workDate, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`,
-            { id, empId, workDate: normalizedDay }
-          );
-        }
-      }
+      await this.insertAttendanceRows(id, employeeIds, start, end);
       return;
     }
 
     await this.executeQuery(
       `UPDATE dbo.TSchedule
-       SET Start_Date = @startDate, End_Date = @endDate, Status = @status, Updated_At = SYSUTCDATETIME()
+       SET Start_Date = @startDate, End_Date = @endDate, Status = @status, Updated_At = SYSDATETIME()
        WHERE ID = @id`,
       { id, startDate: start, endDate: end, status }
     );
@@ -307,8 +299,79 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
 
   async setStatus(id: number, status: Schedule['Status']): Promise<void> {
     await this.executeQuery(
-      `UPDATE dbo.TSchedule SET Status = @status, Updated_At = SYSUTCDATETIME() WHERE ID = @id`,
+      `UPDATE dbo.TSchedule SET Status = @status, Updated_At = SYSDATETIME() WHERE ID = @id`,
       { id, status }
+    );
+  }
+
+  private async insertRosterAndAttendance(
+    scheduleId: number,
+    employeeIds: number[],
+    start: Date,
+    end: Date
+  ): Promise<void> {
+    await this.executeQuery(
+      `;WITH EmployeeIds AS (
+         SELECT DISTINCT TRY_CONVERT(INT, [value]) AS Employee_ID
+         FROM OPENJSON(@employeeIdsJson)
+         WHERE TRY_CONVERT(INT, [value]) IS NOT NULL
+       ),
+       WorkDates AS (
+         SELECT CONVERT(DATE, [value]) AS Work_Date
+         FROM OPENJSON(@workDatesJson)
+       )
+       INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
+       SELECT @scheduleId, Employee_ID, SYSDATETIME()
+       FROM EmployeeIds;
+
+       ;WITH EmployeeIds AS (
+         SELECT DISTINCT TRY_CONVERT(INT, [value]) AS Employee_ID
+         FROM OPENJSON(@employeeIdsJson)
+         WHERE TRY_CONVERT(INT, [value]) IS NOT NULL
+       ),
+       WorkDates AS (
+         SELECT CONVERT(DATE, [value]) AS Work_Date
+         FROM OPENJSON(@workDatesJson)
+       )
+       INSERT INTO dbo.TScheduleAttendance
+         (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
+       SELECT @scheduleId, e.Employee_ID, d.Work_Date, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+       FROM EmployeeIds e
+       CROSS JOIN WorkDates d;`,
+      {
+        scheduleId,
+        employeeIdsJson: JSON.stringify(Array.from(new Set(employeeIds))),
+        workDatesJson: this.dateRangeJson(start, end),
+      }
+    );
+  }
+
+  private async insertAttendanceRows(
+    scheduleId: number,
+    employeeIds: number[],
+    start: Date,
+    end: Date
+  ): Promise<void> {
+    await this.executeQuery(
+      `;WITH EmployeeIds AS (
+         SELECT DISTINCT TRY_CONVERT(INT, [value]) AS Employee_ID
+         FROM OPENJSON(@employeeIdsJson)
+         WHERE TRY_CONVERT(INT, [value]) IS NOT NULL
+       ),
+       WorkDates AS (
+         SELECT CONVERT(DATE, [value]) AS Work_Date
+         FROM OPENJSON(@workDatesJson)
+       )
+       INSERT INTO dbo.TScheduleAttendance
+         (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
+       SELECT @scheduleId, e.Employee_ID, d.Work_Date, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+       FROM EmployeeIds e
+       CROSS JOIN WorkDates d;`,
+      {
+        scheduleId,
+        employeeIdsJson: JSON.stringify(Array.from(new Set(employeeIds))),
+        workDatesJson: this.dateRangeJson(start, end),
+      }
     );
   }
 
@@ -334,12 +397,6 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
     }
 
     // Add to roster
-    await this.executeQuery(
-      `INSERT INTO dbo.TScheduleEmployee (Schedule_ID, Employee_ID, Added_At)
-       VALUES (@scheduleId, @employeeId, SYSUTCDATETIME())`,
-      { scheduleId, employeeId: input.employeeId }
-    );
-
     // Determine date range for attendance records
     const startDate = this.normalizeDateToUTC(input.startDate);
     const scheduleEnd = new Date(schedule.End_Date);
@@ -351,16 +408,6 @@ export class ScheduleDAO extends BaseDAO<Schedule> {
       endDate = scheduleEnd;
     }
 
-    // Create attendance records
-    const days = eachDayOfInterval({ start: startDate, end: endDate });
-    for (const day of days) {
-      const normalizedDay = new Date(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()));
-      await this.executeQuery(
-        `INSERT INTO dbo.TScheduleAttendance
-         (Schedule_ID, Employee_ID, Work_Date, Status, Hours_Worked, Overtime_Hours, Absence_Reason, Hour_Record_ID, Marked_At, Marked_By)
-         VALUES (@scheduleId, @employeeId, @workDate, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`,
-        { scheduleId, employeeId: input.employeeId, workDate: normalizedDay }
-      );
-    }
+    await this.insertRosterAndAttendance(scheduleId, [input.employeeId], startDate, endDate);
   }
 }
