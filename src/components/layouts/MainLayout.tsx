@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Truck, Clock, Shield, Beaker, Users, CalendarDays } from 'lucide-react';
+import { Menu, X, Home, Clock, Users, CalendarDays } from 'lucide-react';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -14,9 +14,6 @@ const navigation = [
   { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Hours', href: '/hours', icon: Clock },
   { name: 'Schedules', href: '/schedules', icon: CalendarDays },
-  { name: 'Transport', href: '/transport', icon: Truck },
-  { name: 'PPE', href: '/ppe', icon: Shield },
-  { name: 'Test', href: '/test', icon: Beaker },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -69,10 +66,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           isActive
                             ? item.name === 'Hours'
                               ? 'text-blue-500'
-                              : item.name === 'Transport'
-                              ? 'text-orange-500'
-                              : item.name === 'PPE'
-                              ? 'text-green-500'
                               : item.name === 'Dashboard'
                               ? 'text-purple-500'
                               : item.name === 'Schedules'
@@ -119,10 +112,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       isActive
                         ? item.name === 'Hours'
                           ? 'text-blue-500'
-                          : item.name === 'Transport'
-                          ? 'text-orange-500'
-                          : item.name === 'PPE'
-                          ? 'text-green-500'
                           : item.name === 'Dashboard'
                           ? 'text-purple-500'
                           : item.name === 'Schedules'

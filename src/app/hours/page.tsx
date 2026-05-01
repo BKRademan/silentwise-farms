@@ -318,6 +318,7 @@ function HoursContent() {
               <AlertDialogDescription>
                 Are you sure you want to delete the hours record
                 for {selectedRecord?.Employee} on {selectedRecord?.Work_Date ? new Date(selectedRecord.Work_Date).toLocaleDateString() : ''}.
+                If this record is linked to a schedule, the matching attendance slot will be reset.
                 This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

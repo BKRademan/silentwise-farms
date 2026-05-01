@@ -3,8 +3,6 @@ export * from './base-dao';
 export * from './employee-dao';
 export * from './grower-dao';
 export * from './hours-dao';
-export * from './transport-dao';
-export * from './ppe-dao';
 export * from './deductions-dao';
 export * from './schedule-dao';
 export * from './attendance-dao';

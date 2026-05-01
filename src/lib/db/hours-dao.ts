@@ -304,14 +304,70 @@ export class HoursDAO extends BaseDAO<HourRecord> {
     }
   }
 
-  async deleteHourRecord(id: number): Promise<void> {
+  async deleteHourRecord(id: number): Promise<{ deleted: boolean; scheduleAttendanceCleared: number }> {
     console.log('Deleting hour record:', id);
     try {
-      await this.executeQuery(
-        'DELETE FROM dbo.THours WHERE ID = @id',
+      const result = await this.executeQuery<{ Deleted: boolean; ScheduleAttendanceCleared: number }>(
+        `SET XACT_ABORT ON;
+
+         DECLARE @Hour TABLE (
+           ID INT NOT NULL PRIMARY KEY,
+           Employee_ID_FK INT NOT NULL,
+           Work_Date DATETIME2 NOT NULL,
+           Grower_ID INT NOT NULL
+         );
+
+         INSERT INTO @Hour (ID, Employee_ID_FK, Work_Date, Grower_ID)
+         SELECT ID, Employee_ID_FK, Work_Date, Grower_ID
+         FROM dbo.THours
+         WHERE ID = @id;
+
+         IF NOT EXISTS (SELECT 1 FROM @Hour)
+         BEGIN
+           SELECT CAST(0 AS BIT) AS Deleted, CAST(0 AS INT) AS ScheduleAttendanceCleared;
+           RETURN;
+         END;
+
+         DECLARE @ClearedAttendance TABLE (ID INT NOT NULL PRIMARY KEY);
+
+         BEGIN TRANSACTION;
+
+         UPDATE a
+         SET Status = NULL,
+             Hours_Worked = NULL,
+             Overtime_Hours = NULL,
+             Absence_Reason = NULL,
+             Hour_Record_ID = NULL,
+             Marked_At = NULL,
+             Marked_By = NULL
+         OUTPUT INSERTED.ID INTO @ClearedAttendance (ID)
+         FROM dbo.TScheduleAttendance a
+         INNER JOIN @Hour h ON 1 = 1
+         LEFT JOIN dbo.TSchedule s ON s.ID = a.Schedule_ID
+         WHERE a.Hour_Record_ID = h.ID
+            OR (
+              a.Employee_ID = h.Employee_ID_FK
+              AND CONVERT(DATE, a.Work_Date) = CONVERT(DATE, h.Work_Date)
+              AND s.Grower_ID = h.Grower_ID
+              AND a.Status IN ('present', 'overtime', 'public_holiday', 'sick_leave')
+            );
+
+         DELETE FROM dbo.THours WHERE ID = @id;
+         DECLARE @DeletedRows INT = @@ROWCOUNT;
+
+         COMMIT TRANSACTION;
+
+         SELECT
+           CAST(CASE WHEN @DeletedRows > 0 THEN 1 ELSE 0 END AS BIT) AS Deleted,
+           (SELECT COUNT(*) FROM @ClearedAttendance) AS ScheduleAttendanceCleared;`,
         { id }
       );
-      console.log('Successfully deleted hour record:', id);
+      const summary = {
+        deleted: Boolean(result[0]?.Deleted),
+        scheduleAttendanceCleared: result[0]?.ScheduleAttendanceCleared ?? 0,
+      };
+      console.log('Successfully deleted hour record:', { id, ...summary });
+      return summary;
     } catch (error) {
       console.error('Error in deleteHourRecord:', error);
       throw error;

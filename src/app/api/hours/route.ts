@@ -128,7 +128,15 @@ export async function DELETE(request: NextRequest) {
       throw new ValidationError('Missing record ID');
     }
 
-    await hoursDao.deleteHourRecord(parseInt(id));
-    return { message: 'Record deleted successfully' };
+    const recordId = parseInt(id, 10);
+    if (Number.isNaN(recordId)) {
+      throw new ValidationError('Invalid record ID');
+    }
+
+    const result = await hoursDao.deleteHourRecord(recordId);
+    return {
+      message: 'Record deleted successfully',
+      scheduleAttendanceCleared: result.scheduleAttendanceCleared,
+    };
   });
 } 
