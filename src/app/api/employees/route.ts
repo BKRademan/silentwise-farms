@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
 import { EmployeeDAO } from '@/lib/db/employee-dao';
 import { handleApiRoute, ValidationError } from '@/lib/api-utils';
-import { Employee } from '@/types/database';
 import { NextResponse } from 'next/server';
-import { HoursDAO } from '@/lib/db/hours-dao';
-import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
+import { ZodError } from 'zod';
+import {
+  employeeCaptureBodySchema,
+  normalizeCapturedFields,
+  validateCreatePayload,
+  mergeCreateDefaults,
+} from '@/lib/validations/employee-capture';
 
 export async function GET() {
   try {
@@ -23,54 +27,31 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const employeeDao = new EmployeeDAO();
   return handleApiRoute(async () => {
-    const body = await request.json();
-    
-    if (!body.EmplNo || !body.LastName || !body.FirstName) {
-      throw new ValidationError('Missing required fields');
+    const raw = await request.json();
+    let parsed;
+    try {
+      parsed = employeeCaptureBodySchema.parse(raw);
+    } catch (e) {
+      if (e instanceof ZodError) {
+        const msg = e.errors[0]?.message ?? 'Validation failed';
+        throw new ValidationError(msg);
+      }
+      throw e;
     }
 
-    const employee: Omit<Employee, 'ID'> = {
-      EmplNo: body.EmplNo,
-      LastName: body.LastName,
-      FirstName: body.FirstName,
-      knownAs: body.knownAs || null,
-      RATE: body.RATE || null,
-      IDNumber: body.IDNumber || null,
-      DateEngaged: body.DateEngaged ? requireSouthAfricaDateOnly(body.DateEngaged, 'DateEngaged') : null,
-      BankName: body.BankName || null,
-      BranchCode: body.BranchCode || null,
-      AccHolder: body.AccHolder || null,
-      BankAccNo: body.BankAccNo || null
-    };
+    const normalized = normalizeCapturedFields(parsed);
+    validateCreatePayload(normalized);
 
-    return employeeDao.addEmployee(employee);
+    if (normalized.IDNumber && /^\d{13}$/.test(normalized.IDNumber)) {
+      const dup = await employeeDao.findByIdNumber(normalized.IDNumber);
+      if (dup) {
+        throw new ValidationError(
+          'An employee with this ID number already exists.'
+        );
+      }
+    }
+
+    const row = mergeCreateDefaults(normalized);
+    return employeeDao.addEmployee(row);
   });
 }
-
-export async function PUT(request: NextRequest) {
-  const employeeDao = new EmployeeDAO();
-  return handleApiRoute(async () => {
-    const body = await request.json();
-    
-    if (!body.id) {
-      throw new ValidationError('Missing employee ID');
-    }
-
-    const updates: Partial<Employee> = {
-      EmplNo: body.EmplNo,
-      LastName: body.LastName,
-      FirstName: body.FirstName,
-      knownAs: body.knownAs,
-      RATE: body.RATE,
-      IDNumber: body.IDNumber,
-      DateEngaged: body.DateEngaged ? requireSouthAfricaDateOnly(body.DateEngaged, 'DateEngaged') : undefined,
-      BankName: body.BankName,
-      BranchCode: body.BranchCode,
-      AccHolder: body.AccHolder,
-      BankAccNo: body.BankAccNo
-    };
-
-    await employeeDao.updateEmployee(body.id, updates);
-    return { message: 'Employee updated successfully' };
-  });
-} 

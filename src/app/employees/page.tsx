@@ -1,17 +1,47 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, type FormEvent } from 'react';
 import { format, subMonths, isAfter } from 'date-fns';
-import { Search, User, Filter, CheckSquare, Square, CreditCard, AlertTriangle } from 'lucide-react';
+import {
+  Search,
+  User,
+  CheckSquare,
+  Square,
+  CreditCard,
+  Plus,
+  Pencil,
+  Trash2,
+  Download,
+  UserPlus,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { AvailableEmployeeNumbers } from '@/components/employees/available-employee-numbers';
+import { QuickAddEmployeeModal } from '@/components/employees/quick-add-employee-modal';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface Employee {
   ID: number;
@@ -36,34 +66,45 @@ export default function EmployeesPage() {
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [showOnlyDuplicateIDs, setShowOnlyDuplicateIDs] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [companyNumber, setCompanyNumber] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
+
+  const loadEmployees = useCallback(async () => {
+    setLoading(true);
+    try {
+      const employeesRes = await fetch('/api/employees');
+
+      if (!employeesRes.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const employeesData = await employeesRes.json();
+      const sortedEmployees = employeesData.sort((a: Employee, b: Employee) => a.ID - b.ID);
+
+      setEmployees(sortedEmployees);
+      setFilteredEmployees(sortedEmployees);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Could not load employees',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const employeesRes = await fetch('/api/employees');
-        
-        if (!employeesRes.ok) {
-          throw new Error('Failed to fetch data');
-        }
-        
-        const employeesData = await employeesRes.json();
-        console.log('Employee data received:', employeesData);
-        
-        // Sort employees by ID (lowest to highest) by default
-        const sortedEmployees = employeesData.sort((a: Employee, b: Employee) => a.ID - b.ID);
-        
-        setEmployees(sortedEmployees);
-        setFilteredEmployees(sortedEmployees);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchData();
-  }, []);
+    void loadEmployees();
+  }, [loadEmployees]);
 
   // Add logic to find duplicate ID numbers
   const duplicateIDNumbers = useMemo(() => {
@@ -154,6 +195,99 @@ export default function EmployeesPage() {
     router.push(`/employees/${id}/bank-details`);
   };
 
+  const handleEdit = (id: number) => {
+    router.push(`/employees/${id}/edit`);
+  };
+
+  const handleExportDetails = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedCompanyNumber = companyNumber.trim();
+
+    if (!trimmedCompanyNumber) {
+      toast({
+        variant: 'destructive',
+        title: 'Company number required',
+        description: 'Enter the company number before exporting.',
+      });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const res = await fetch(
+        `/api/employees/export?company=${encodeURIComponent(trimmedCompanyNumber)}`
+      );
+
+      if (!res.ok) {
+        let message = 'Failed to export employee details';
+        try {
+          const errorBody = await res.json();
+          message = errorBody.error || message;
+        } catch {
+          // Keep the default message if the response is not JSON.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const contentDisposition = res.headers.get('Content-Disposition') ?? '';
+      const filename =
+        contentDisposition.match(/filename="?([^";]+)"?/i)?.[1] ??
+        `employee-details-${trimmedCompanyNumber}.xlsx`;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      setExportDialogOpen(false);
+      toast({
+        title: 'Export downloaded',
+        description: 'Employee details were exported for Excel.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not export employees',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const openDeleteDialog = (employee: Employee) => {
+    setDeleteTarget(employee);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/employees/${deleteTarget.ID}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.error || 'Delete failed');
+      }
+      toast({ title: 'Employee deleted' });
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+      await loadEmployees();
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not delete',
+        description: e instanceof Error ? e.message : 'Delete failed',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Replace the restore scroll useEffect
   useEffect(() => {
     // Only attempt to restore scroll position after data is loaded
@@ -208,8 +342,32 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6">
       {/* Heading row */}
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Employees</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setQuickAddOpen(true)}
+            className="gap-2"
+          >
+            <UserPlus className="h-4 w-4" />
+            Quick Add
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setExportDialogOpen(true)}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export details
+          </Button>
+          <Button type="button" onClick={() => router.push('/employees/new')} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add employee
+          </Button>
+        </div>
       </div>
 
       {/* Filters row with search - all on one line */}
@@ -296,7 +454,7 @@ export default function EmployeesPage() {
               <TableHead>ID Number</TableHead>
               <TableHead className="w-24">Rate</TableHead>
               <TableHead>Last Worked</TableHead>
-              <TableHead className="w-24">Actions</TableHead>
+              <TableHead className="min-w-[11rem]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -340,15 +498,40 @@ export default function EmployeesPage() {
                         : 'Never'}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewBankDetails(employee.ID)}
-                        className="flex items-center gap-1"
-                      >
-                        <CreditCard className="h-4 w-4" />
-                        <span>Bank</span>
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => handleEdit(employee.ID)}
+                          className="h-8 px-2"
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => handleViewBankDetails(employee.ID)}
+                          className="flex items-center gap-1 h-8 px-2"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          <span className="hidden lg:inline">Bank</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          type="button"
+                          onClick={() => openDeleteDialog(employee)}
+                          className="h-8 px-2 text-destructive hover:text-destructive"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -431,15 +614,38 @@ export default function EmployeesPage() {
                       </span>
                     </div>
                     
-                    <div className="pt-2 border-t mt-2">
+                    <div className="pt-2 border-t mt-2 flex flex-col gap-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant={isDuplicateID ? 'secondary' : 'outline'}
+                          size="sm"
+                          type="button"
+                          onClick={() => handleEdit(employee.ID)}
+                          className="flex items-center justify-center gap-2"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant={isDuplicateID ? 'secondary' : 'outline'}
+                          size="sm"
+                          type="button"
+                          onClick={() => handleViewBankDetails(employee.ID)}
+                          className="flex items-center justify-center gap-2"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Bank
+                        </Button>
+                      </div>
                       <Button
-                        variant={isDuplicateID ? "secondary" : "outline"}
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleViewBankDetails(employee.ID)}
-                        className="w-full flex items-center justify-center gap-2"
+                        type="button"
+                        onClick={() => openDeleteDialog(employee)}
+                        className="w-full flex items-center justify-center gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
                       >
-                        <CreditCard className="h-4 w-4" />
-                        <span>View Bank Details</span>
+                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </Button>
                     </div>
                   </div>
@@ -453,6 +659,80 @@ export default function EmployeesPage() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete employee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget ? (
+                <>
+                  This will permanently remove{' '}
+                  <strong>
+                    {deleteTarget.fullName ||
+                      `${deleteTarget.FirstName ?? ''} ${deleteTarget.LastName ?? ''}`.trim() ||
+                      `(ID ${deleteTarget.ID})`}
+                  </strong>
+                  . You cannot delete an employee who has linked hours, schedules, or deductions.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void confirmDelete()}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent>
+          <form onSubmit={handleExportDetails} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Export Employee Details</DialogTitle>
+              <DialogDescription>
+                Enter the company number to include in the Excel export.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="company-number">Company number</Label>
+              <Input
+                id="company-number"
+                value={companyNumber}
+                onChange={(event) => setCompanyNumber(event.target.value)}
+                placeholder="Enter company number"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={exporting}
+                onClick={() => setExportDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={exporting}>
+                {exporting ? 'Exporting...' : 'Export'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <QuickAddEmployeeModal
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+        onEmployeeAdded={() => void loadEmployees()}
+      />
     </div>
   );
 } 
