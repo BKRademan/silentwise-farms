@@ -10,6 +10,8 @@ import { Combobox } from '@/components/ui/combobox';
 import { useData } from '@/lib/contexts/data-context';
 import { useCallback } from 'react';
 import { requireSouthAfricaDateOnly } from '@/lib/date-time/south-africa';
+import { useToast } from '@/components/ui/use-toast';
+import { AlertTriangle } from 'lucide-react';
 
 interface FiltersProps {
   onFiltersChange: (filters: {
@@ -25,8 +27,10 @@ export function Filters({ onFiltersChange }: FiltersProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { employees, growers } = useData();
+  const { toast } = useToast();
   const [startDate, setStartDate] = React.useState<Date>();
   const [endDate, setEndDate] = React.useState<Date>();
+  const isRangeInverted = Boolean(startDate && endDate && startDate > endDate);
   const [selectedGrowerId, setSelectedGrowerId] = React.useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = React.useState("");
 
@@ -92,15 +96,39 @@ export function Filters({ onFiltersChange }: FiltersProps) {
     onFiltersChange(newFilters);
   }, [searchParams, router, pathname, onFiltersChange]);
 
-  // In date selection handlers:
-  function handleDateSelect(date: Date | undefined) {
+  function warnIfRangeInverted(start: Date | undefined, end: Date | undefined) {
+    if (start && end && start > end) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid date range',
+        description: `Start date (${format(start, 'PPP')}) is after end date (${format(end, 'PPP')}). This will return no records — adjust one of the dates before refreshing.`,
+      });
+    }
+  }
+
+  function handleStartDateSelect(date: Date | undefined) {
     if (!date) return;
-    
-    const selectedDate = requireSouthAfricaDateOnly(date, 'date');
-    
+
+    setStartDate(date);
+    warnIfRangeInverted(date, endDate);
+
     updateFilters({
-      startDate: selectedDate,
-      endDate: selectedDate,
+      startDate: requireSouthAfricaDateOnly(date, 'startDate'),
+      endDate: endDate ? requireSouthAfricaDateOnly(endDate, 'endDate') : undefined,
+      growerId: selectedGrowerId || undefined,
+      employeeId: selectedEmployeeId || undefined
+    });
+  }
+
+  function handleEndDateSelect(date: Date | undefined) {
+    if (!date) return;
+
+    setEndDate(date);
+    warnIfRangeInverted(startDate, date);
+
+    updateFilters({
+      startDate: startDate ? requireSouthAfricaDateOnly(startDate, 'startDate') : undefined,
+      endDate: requireSouthAfricaDateOnly(date, 'endDate'),
       growerId: selectedGrowerId || undefined,
       employeeId: selectedEmployeeId || undefined
     });
@@ -116,7 +144,8 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 variant="outline"
                 className={cn(
                   'w-full justify-start text-left font-normal',
-                  !startDate && 'text-muted-foreground'
+                  !startDate && 'text-muted-foreground',
+                  isRangeInverted && 'border-red-500 text-red-600'
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -127,10 +156,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
               <Calendar
                 mode="single"
                 selected={startDate}
-                onSelect={(date) => {
-                  setStartDate(date);
-                  handleDateSelect(date);
-                }}
+                onSelect={handleStartDateSelect}
                 initialFocus
               />
             </PopoverContent>
@@ -144,7 +170,8 @@ export function Filters({ onFiltersChange }: FiltersProps) {
                 variant="outline"
                 className={cn(
                   'w-full justify-start text-left font-normal',
-                  !endDate && 'text-muted-foreground'
+                  !endDate && 'text-muted-foreground',
+                  isRangeInverted && 'border-red-500 text-red-600'
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -155,10 +182,7 @@ export function Filters({ onFiltersChange }: FiltersProps) {
               <Calendar
                 mode="single"
                 selected={endDate}
-                onSelect={(date) => {
-                  setEndDate(date);
-                  handleDateSelect(date);
-                }}
+                onSelect={handleEndDateSelect}
                 initialFocus
               />
             </PopoverContent>
@@ -200,6 +224,12 @@ export function Filters({ onFiltersChange }: FiltersProps) {
           />
         </div>
       </div>
+      {isRangeInverted && (
+        <div className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>Start date is after end date — this will return no records. Adjust one of the dates before refreshing.</span>
+        </div>
+      )}
     </div>
   );
 } 
