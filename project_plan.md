@@ -1,7 +1,9 @@
 # Farm Workers Management System - Project Plan
 
-> **Current work:** Transport & PPE capture (replacing the Retool app) is tracked in
-> [`docs/plans/phase-2-ppe-invoices.md`](docs/plans/phase-2-ppe-invoices.md). Start there.
+> **Transport & PPE status (2026-10-16):** Phases 1 and 2 are complete, merged into `main`,
+> deployed to production, and accepted after the user completed testing. The financial year
+> starts on 1 March; unknown-employee deductions are intentionally left unchanged.
+> See [`docs/plans/phase-2-ppe-invoices.md`](docs/plans/phase-2-ppe-invoices.md) for the current handover.
 > This file is the original high-level plan; the app was built with Next.js rather than
 > the MUI/Express stack described below.
 
@@ -134,4 +136,4 @@ farm-workers-app/
 2. Initialize project with basic structure
 3. Implement database connection
 4. Create first API endpoint
-5. Develop basic UI components 
+5. Develop basic UI components

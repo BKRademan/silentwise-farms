@@ -1,12 +1,16 @@
 # Transport & PPE: Plan and Handover
 
-Status as of **2026-10-16**: Phase 1 is built and committed on branch
-`feature/transport-ppe-capture` (b4b363f). The Phase 2 database tables **exist on the live
-database**. Phase 2 application code (sections 2.1–2.8 below) is **built and reviewed on the same
-branch, not yet deployed**. It passes `npx tsc --noEmit` and `npx next build`; its SQL was verified against the
-live database inside transactions that were rolled back (no data was written). Nothing has been
-captured through the new screens yet, so the Phase 2 tables are still empty apart from the two
-seeded drivers.
+Status as of **2026-10-16**: **Phases 1 and 2 are complete, merged into `main`, and deployed
+to production** at [silentwisefarms.netlify.app](https://silentwisefarms.netlify.app).
+[PR #1](https://github.com/BKRademan/silentwise-farms/pull/1) merged implementation commits
+`b4b363f` and `912bb07` in merge commit `348f2f3`. The Phase 2 database tables exist on the
+live database. The merged feature branch has been removed locally and from origin.
+
+`npx tsc --noEmit` and `npx next build` passed. DAO write checks used rolled-back transactions;
+no test records were committed during implementation. Production pages and read APIs were
+verified after deployment. **The user has confirmed all production testing is complete** and
+the **1 March financial-year start is correct**. No implementation or acceptance tasks remain
+for this Transport & PPE plan. Unknown-employee deductions are intentionally left unchanged.
 
 Read this file first, then `database_schema.md`. The original Retool app that
 these screens replace is exported in `docs/Silentwise App/` (SQL in `lib/`,
@@ -23,7 +27,8 @@ screens in `src/*.rsx`).
 | Stock | Track stock on hand per item. **Assume zero stock on hand at the start** (see "Stock rule"). |
 | Deduction price | Capturing an invoice must **not** change `TPPE_Items.PPE_Item_Value` automatically. When a line's unit cost differs from the item's deduction price, offer a **one-click "update deduction price"** action. |
 | Grower recovery | Simple capture of the **total** PPE amount charged to a grower (date, grower, reference, amount). No per-item split. Reported alongside purchases and deductions. |
-| Orphaned deductions | ~187 `TDeductions` rows have an `FK_Emp_ID` that matches no employee. **Ignore for now**; they show as "Unknown employee" in the app. |
+| Orphaned deductions | ~187 `TDeductions` rows have an `FK_Emp_ID` that matches no employee. **Leave them unchanged**, as confirmed by the user on 2026-10-16; they show as "Unknown employee" in the app. No cleanup is planned. |
+| Financial year | Starts on **1 March**, confirmed by the user on 2026-10-16. |
 | Drivers | Managed in a `TTransport_Drivers` table with add/edit/delete. `TTransport.Driver` stays a text column holding the name. |
 | Transport units | `TTransport.KM` = days, `TTransport.RatePerKM` = rate per day. Don't rename the columns; `TransportDAO` aliases them. |
 
@@ -62,7 +67,7 @@ and clears the employee. The old unused `/api/deductions` route was removed.
 
 ---
 
-## Phase 2: built and reviewed
+## Phase 2: complete and deployed
 
 | Section | Route(s) | Key files |
 |---------|----------|-----------|
@@ -111,19 +116,19 @@ Behaviour worth knowing:
   signed, non-zero and may have up to 2 decimals (the input uses `step={0.01}`), matching
   fractional invoice quantities.
 - **Report**: defaults to the financial year to date (`FINANCIAL_YEAR_START_MONTH = 3`, i.e.
-  1 March; the user has not been asked to confirm). It counts a PPE issue as a `TDeductions` row with
+  1 March, confirmed by the user). It counts a PPE issue as a `TDeductions` row with
   `PPE` set, **except** the 20 legacy rows with `PPE = 0` and no item, which are loan-only rows
   from the old combined screen. Per-item "Difference" is only shown where the item was purchased
   in the period. A banner warns when the range starts before invoices were captured.
 
-Not verified by hand (writes would hit production): clicking Save on any new form, the
-"Save & Add Another" focus move, and the "Set deduction price" link. The underlying DAO/SQL paths
-were exercised in rolled-back transactions; the UI was checked visually without saving.
+Acceptance testing is complete: the user confirmed all testing was done on 2026-10-16.
+The earlier implementation-stage limitation on testing form saves, "Save & Add Another" focus
+and the deduction-price shortcut is closed by that confirmation.
 
 An independent review of all Phase 2 changes found one issue, now fixed: the stock adjustment
 quantity input used `step={1}`, so the browser blocked decimal adjustments such as `-0.5`.
 
-The original Phase 2 specification follows for reference.
+The original Phase 2 specification follows for reference; all sections below have been implemented.
 
 ### 2.1 Issue PPE form field order (small)
 In `src/components/ppe/ppe-issue-form-dialog.tsx`, lay the fields out in this order,
@@ -175,8 +180,8 @@ dialog (item, date, signed quantity, reason `opening` / `stock_take` / `write_of
 and list recent adjustments.
 
 ### 2.7 PPE cost report
-**PPE → Report** tab, date range filter (default: current financial year to date; ask the
-user when the financial year starts, or use 1 March since that is the SA default).
+**PPE → Report** tab, date range filter (default: current financial year to date,
+starting on 1 March, as confirmed by the user).
 
 - Summary cards: **Purchased** (invoice lines excl VAT), **Deducted from employees**
   (`TDeductions.PPE`), **Charged to growers**, **Net cost to business**
