@@ -1,0 +1,2 @@
+INSERT INTO THours (Work_Date, Hours_Worked, Employee_ID_FK, Grower_ID, Overtime, PHoliday, Emp_Rate, Con_Tot, Man_Fee, Sick_Leave)
+VALUES ({{txtDate.value}}, {{txtHours.value}}, {{cboEmployee.value}}, {{cboGrower.value}}, {{txtOvertime.value}}, {{txtPubHoliday.value}}, {{txtEmpRate.value}}, {{txtConTot.value}}, {{txtManFee.value}}, {{txtSickLeave.value}});

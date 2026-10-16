@@ -1,0 +1,2 @@
+INSERT INTO TTransport (Date, Grower_ID_FK, KM, RatePerKM, Driver, Comment)
+VALUES ({{txtTransDate.value}}, {{cboTransGrower.value}}, {{txtDay.value}}, {{txtRPD.value}}, {{cboDriver_Transporter.value}}, {{txtComments_Transporter.value}});

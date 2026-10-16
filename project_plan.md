@@ -1,5 +1,10 @@
 # Farm Workers Management System - Project Plan
 
+> **Current work:** Transport & PPE capture (replacing the Retool app) is tracked in
+> [`docs/plans/phase-2-ppe-invoices.md`](docs/plans/phase-2-ppe-invoices.md). Start there.
+> This file is the original high-level plan; the app was built with Next.js rather than
+> the MUI/Express stack described below.
+
 ## 1. Technology Stack
 - **Frontend**: React.js with Material-UI (MUI)
   - Modern, responsive UI components

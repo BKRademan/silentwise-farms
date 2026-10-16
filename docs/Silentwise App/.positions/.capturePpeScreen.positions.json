@@ -1,0 +1,112 @@
+{
+  "bAdd_PPE": {
+    "container": "container45"
+  },
+  "bDelete_PPE": {
+    "container": "container44",
+    "height": 0,
+    "width": 0
+  },
+  "bEdit_PPE": {
+    "container": "container50",
+    "height": 0,
+    "width": 0
+  },
+  "bNew_PPE": {
+    "container": "container46",
+    "height": 0,
+    "width": 0
+  },
+  "bRefreshEmps_PPE": {
+    "container": "container35",
+    "height": 0,
+    "width": 0
+  },
+  "cboEmp_PPE": {
+    "container": "container37"
+  },
+  "cboPPE_Item": {
+    "container": "container41"
+  },
+  "col_PPE_Data": {},
+  "container32": {},
+  "container33": {
+    "container": "container32"
+  },
+  "container34": {
+    "container": "container33"
+  },
+  "container35": {
+    "container": "container34"
+  },
+  "container36": {
+    "container": "container33"
+  },
+  "container37": {
+    "container": "container34"
+  },
+  "container38": {
+    "container": "container32",
+    "height": 1,
+    "width": 4
+  },
+  "container41": {
+    "container": "container38"
+  },
+  "container42": {
+    "container": "container38"
+  },
+  "container43": {},
+  "container44": {
+    "container": "container43",
+    "height": 0,
+    "width": 0
+  },
+  "container45": {
+    "container": "container43"
+  },
+  "container46": {
+    "container": "container43"
+  },
+  "container47": {
+    "container": "col_PPE_Data",
+    "height": 0,
+    "width": 0
+  },
+  "container48": {
+    "container": "container47",
+    "height": 0,
+    "width": 0
+  },
+  "container49": {
+    "container": "container47"
+  },
+  "container50": {
+    "container": "container47"
+  },
+  "container51": {
+    "container": "container32",
+    "height": 0,
+    "width": 0
+  },
+  "txtDate_PPE": {
+    "container": "container36",
+    "height": 0,
+    "width": 0
+  },
+  "txtEmp_PPE": {
+    "container": "container48",
+    "height": 0,
+    "width": 0
+  },
+  "txtPPEValue": {
+    "container": "container42",
+    "height": 0,
+    "width": 0
+  },
+  "txtPPE_EditID": {},
+  "txtValue_PPE": {
+    "container": "container49",
+    "height": 0
+  }
+}

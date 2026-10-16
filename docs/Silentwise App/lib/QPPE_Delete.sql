@@ -1,0 +1,1 @@
+DELETE FROM dbo.TDeductions WHERE ID = {{txtPPE_EditID.value}};

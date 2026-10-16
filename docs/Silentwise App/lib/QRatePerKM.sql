@@ -1,0 +1,1 @@
+SELECT RatePerKM FROM TGrowers WHERE ID = {{cboTransGrower.value}};

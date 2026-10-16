@@ -1,0 +1,116 @@
+{
+  "bEdit_HoursRecord": {
+    "container": "container12",
+    "height": 0,
+    "width": 0
+  },
+  "bHours_Confirm": {
+    "container": "container15"
+  },
+  "bHours_Delete": {
+    "container": "container14"
+  },
+  "bNew_Hours": {
+    "container": "container16",
+    "height": 0,
+    "width": 0
+  },
+  "bRefreshCBO": {
+    "container": "container31"
+  },
+  "cboEmployee": {
+    "container": "container30"
+  },
+  "cboGrower": {
+    "container": "container4"
+  },
+  "colHours_Data": {},
+  "conButtonGroup": {},
+  "container10": {
+    "container": "container9",
+    "height": 0,
+    "width": 0
+  },
+  "container11": {
+    "container": "container9"
+  },
+  "container12": {
+    "container": "container9"
+  },
+  "container14": {
+    "container": "conButtonGroup",
+    "height": 0,
+    "width": 0
+  },
+  "container15": {
+    "container": "conButtonGroup",
+    "height": 0,
+    "width": 0
+  },
+  "container16": {
+    "container": "conButtonGroup",
+    "height": 0,
+    "width": 0
+  },
+  "container28": {
+    "container": "container5"
+  },
+  "container29": {
+    "container": "container5"
+  },
+  "container30": {
+    "container": "container28"
+  },
+  "container31": {
+    "container": "container28"
+  },
+  "container4": {},
+  "container5": {},
+  "container6": {},
+  "container7": {},
+  "container9": {
+    "container": "colHours_Data",
+    "height": 0,
+    "width": 0
+  },
+  "text1": {
+    "container": "container10"
+  },
+  "txtConTot": {
+    "container": "container7"
+  },
+  "txtConTot_Perc": {
+    "container": "container7"
+  },
+  "txtDate": {
+    "container": "container4"
+  },
+  "txtEmpCheck": {},
+  "txtEmpRate": {
+    "container": "container7"
+  },
+  "txtHours": {
+    "container": "container29"
+  },
+  "txtHours_Edit": {
+    "container": "container11",
+    "height": 0,
+    "width": 0
+  },
+  "txtID_HoursEdit": {},
+  "txtManFee": {
+    "container": "container7"
+  },
+  "txtManFee_Perc": {
+    "container": "container7"
+  },
+  "txtOvertime": {
+    "container": "container6"
+  },
+  "txtPubHoliday": {
+    "container": "container6"
+  },
+  "txtSickLeave": {
+    "container": "container6"
+  }
+}

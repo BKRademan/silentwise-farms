@@ -1,0 +1,1 @@
+SELECT HasManFee, ManFee, ContPerc, HrsPerDay FROM TGrowers WHERE ID = {{cboGrower.value}};

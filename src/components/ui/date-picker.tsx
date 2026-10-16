@@ -17,18 +17,23 @@ interface DatePickerProps {
   onSelect?: (date: Date | undefined) => void;
   className?: string;
   placeholder?: string;
+  disableFuture?: boolean;
 }
 
-export function DatePicker({ 
-  date, 
-  onSelect, 
+export function DatePicker({
+  date,
+  onSelect,
   className,
-  placeholder = 'Pick a date'
+  placeholder = 'Pick a date',
+  disableFuture = false,
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant={'outline'}
           className={cn(
             'w-full justify-start text-left font-normal',
@@ -40,14 +45,24 @@ export function DatePicker({
           {date ? format(date, 'PPP') : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={onSelect}
-          initialFocus
-        />
-      </PopoverContent>
+      {/* Wrapper keeps the calendar clickable when rendered inside a modal dialog. */}
+      <div className="z-[9999] fixed">
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="bg-white rounded-md border shadow-md" style={{ pointerEvents: 'auto' }}>
+            <Calendar
+              mode="single"
+              selected={date}
+              defaultMonth={date}
+              onSelect={(selected) => {
+                onSelect?.(selected);
+                if (selected) setOpen(false);
+              }}
+              disabled={disableFuture ? (day) => day > new Date() : undefined}
+              initialFocus
+            />
+          </div>
+        </PopoverContent>
+      </div>
     </Popover>
   );
-} 
+}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Clock, Users, CalendarDays } from 'lucide-react';
+import { Menu, X, Home, Clock, Users, CalendarDays, Truck, Shield } from 'lucide-react';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -14,6 +14,8 @@ const navigation = [
   { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Hours', href: '/hours', icon: Clock },
   { name: 'Schedules', href: '/schedules', icon: CalendarDays },
+  { name: 'Transport', href: '/transport', icon: Truck },
+  { name: 'PPE', href: '/ppe', icon: Shield },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -48,9 +50,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   {navigation.map((item) => {
                     const Icon = item.icon;
                     const isActive =
-                      item.href === '/schedules'
-                        ? pathname.startsWith('/schedules')
-                        : pathname === item.href;
+                      item.href === '/'
+                        ? pathname === '/'
+                        : pathname.startsWith(item.href);
                     return (
                       <Link
                         key={item.name}
@@ -70,6 +72,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                               ? 'text-purple-500'
                               : item.name === 'Schedules'
                               ? 'text-teal-600'
+                              : item.name === 'Transport'
+                              ? 'text-orange-500'
+                              : item.name === 'PPE'
+                              ? 'text-green-500'
                               : 'text-gray-900'
                             : 'text-gray-400 group-hover:text-gray-500'
                         }`} />
@@ -95,9 +101,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
               {navigation.map((item) => {
                 const Icon = item.icon;
                 const isActive =
-                  item.href === '/schedules'
-                    ? pathname.startsWith('/schedules')
-                    : pathname === item.href;
+                  item.href === '/'
+                    ? pathname === '/'
+                    : pathname.startsWith(item.href);
                 return (
                   <Link
                     key={item.name}
@@ -116,6 +122,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
                           ? 'text-purple-500'
                           : item.name === 'Schedules'
                           ? 'text-teal-600'
+                          : item.name === 'Transport'
+                          ? 'text-orange-500'
+                          : item.name === 'PPE'
+                          ? 'text-green-500'
                           : 'text-gray-900'
                         : 'text-gray-400 group-hover:text-gray-500'
                     }`} />

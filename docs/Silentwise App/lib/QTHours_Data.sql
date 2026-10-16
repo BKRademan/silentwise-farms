@@ -1,0 +1,1 @@
+SELECT * FROM dbo.THour_Data_View WHERE Work_Date = {{ txtDate.value }} AND Grower_ID = {{ cboGrower.value }} ORDER BY ID DESC;

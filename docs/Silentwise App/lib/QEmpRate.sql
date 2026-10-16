@@ -1,0 +1,1 @@
+SELECT RATE FROM TEmployee_Details WHERE ID = {{cboEmployee.value}};

@@ -31,15 +31,18 @@ interface ComboboxProps {
   onValueChange: (value: string) => void;
   placeholder?: string;
   enableSelectAll?: boolean;
+  id?: string;
 }
 
-export function Combobox({ 
+/** The ref points at the trigger button, so callers can focus the field. */
+export const Combobox = React.forwardRef<HTMLButtonElement, ComboboxProps>(function Combobox({
   options, 
   value, 
   onValueChange, 
   placeholder = "Select option...",
-  enableSelectAll = false 
-}: ComboboxProps) {
+  enableSelectAll = false,
+  id,
+}, ref) {
   const [open, setOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
 
@@ -68,6 +71,9 @@ export function Combobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          ref={ref}
+          id={id}
+          type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -167,4 +173,4 @@ export function Combobox({
       </div>
     </Popover>
   )
-}
+})
