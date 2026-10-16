@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
-import { TransportDAO } from '@/lib/db';
-import { handleApiRoute, parseOrThrow, requireIdParam } from '@/lib/api-utils';
+import { TransportDAO, TransportDriverDAO } from '@/lib/db';
+import { handleApiRoute, parseOrThrow, requireIdParam, ValidationError } from '@/lib/api-utils';
 import { dateRangeQuerySchema, transportInputSchema } from '@/lib/validations/capture';
 
 const transportDao = new TransportDAO();
+const driverDao = new TransportDriverDAO();
 
 export async function GET(request: NextRequest) {
   return handleApiRoute(async () => {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return handleApiRoute(async () => {
     const input = parseOrThrow(transportInputSchema, await request.json());
-    return transportDao.add(input);
+    return transportDao.add({ ...input, Driver: await driverDao.resolveForTransport(input.Driver) });
   });
 }
 
@@ -32,7 +33,13 @@ export async function PUT(request: NextRequest) {
   return handleApiRoute(async () => {
     const body = await request.json();
     const id = requireIdParam(body?.id != null ? String(body.id) : null, 'transport ID');
-    await transportDao.update(id, parseOrThrow(transportInputSchema, body));
+    const input = parseOrThrow(transportInputSchema, body);
+    const current = await transportDao.findById(id);
+    if (!current) throw new ValidationError('Transport record not found');
+    await transportDao.update(id, {
+      ...input,
+      Driver: await driverDao.resolveForTransport(input.Driver, current.Driver),
+    });
     return { message: 'Transport record updated' };
   });
 }

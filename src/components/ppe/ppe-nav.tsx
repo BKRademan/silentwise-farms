@@ -7,6 +7,11 @@ import { cn } from '@/lib/utils';
 const tabs = [
   { name: 'Issues', href: '/ppe' },
   { name: 'Items', href: '/ppe/items' },
+  { name: 'Stock', href: '/ppe/stock' },
+  { name: 'Invoices', href: '/ppe/invoices' },
+  { name: 'Suppliers', href: '/ppe/suppliers' },
+  { name: 'Grower Charges', href: '/ppe/grower-charges' },
+  { name: 'Report', href: '/ppe/report' },
 ];
 
 export function PPENav() {

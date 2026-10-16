@@ -53,12 +53,6 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   return handleApiRoute(async () => {
     const id = requireIdParam(request.nextUrl.searchParams.get('id'), 'PPE item ID');
-    const issued = await ppeItemDao.issueCount(id);
-    if (issued > 0) {
-      throw new ValidationError(
-        `This item has been issued ${issued} time${issued === 1 ? '' : 's'} and cannot be deleted`
-      );
-    }
     await ppeItemDao.remove(id);
     return { message: 'PPE item deleted' };
   });

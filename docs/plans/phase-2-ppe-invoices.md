@@ -1,8 +1,12 @@
 # Transport & PPE: Plan and Handover
 
 Status as of **2026-10-16**: Phase 1 is built and committed on branch
-`feature/transport-ppe-capture`. The Phase 2 database tables **exist on the live
-database**. Phase 2 application code has **not been started**.
+`feature/transport-ppe-capture` (b4b363f). The Phase 2 database tables **exist on the live
+database**. Phase 2 application code (sections 2.1–2.8 below) is **built and reviewed on the same
+branch, not yet deployed**. It passes `npx tsc --noEmit` and `npx next build`; its SQL was verified against the
+live database inside transactions that were rolled back (no data was written). Nothing has been
+captured through the new screens yet, so the Phase 2 tables are still empty apart from the two
+seeded drivers.
 
 Read this file first, then `database_schema.md`. The original Retool app that
 these screens replace is exported in `docs/Silentwise App/` (SQL in `lib/`,
@@ -46,7 +50,7 @@ not for stock.
 | Feature | Route | Key files |
 |---------|-------|-----------|
 | Transport capture/list | `/transport`, `/api/transport` | `src/app/transport/page.tsx`, `src/components/transport/transport-form-dialog.tsx`, `src/lib/db/transport-dao.ts` |
-| Driver suggestions | `/api/transport/drivers` | Currently `SELECT DISTINCT` from `TTransport`; **switch to `TTransport_Drivers` in Phase 2** |
+| Driver list | `/api/transport/drivers` | Reads `TTransport_Drivers` since Phase 2 (see 2.2) |
 | PPE issues (deductions) | `/ppe`, `/api/ppe/issues` | `src/app/ppe/page.tsx`, `src/components/ppe/ppe-issue-form-dialog.tsx`, `src/lib/db/deductions-dao.ts` |
 | PPE items | `/ppe/items`, `/api/ppe/items` (GET/POST/PUT/PATCH price/DELETE) | `src/app/ppe/items/page.tsx`, `src/components/ppe/ppe-item-form-dialog.tsx`, `src/lib/db/ppe-dao.ts` |
 | PPE section tabs | n/a | `src/components/ppe/ppe-nav.tsx`: add new tabs here |
@@ -58,9 +62,68 @@ and clears the employee. The old unused `/api/deductions` route was removed.
 
 ---
 
-## Phase 2: to build
+## Phase 2: built and reviewed
 
-Do these in order; each is independently shippable.
+| Section | Route(s) | Key files |
+|---------|----------|-----------|
+| 2.1 Issue form order | `/ppe` | `src/components/ppe/ppe-issue-form-dialog.tsx` (`Combobox` now forwards a ref to its trigger) |
+| 2.2 Drivers | `/transport/drivers`, `/api/transport/drivers` | `src/lib/db/driver-dao.ts`, `src/app/transport/drivers/page.tsx`, `src/components/transport/driver-form-dialog.tsx`, `transport-form-dialog.tsx` |
+| 2.3 Suppliers | `/ppe/suppliers`, `/api/ppe/suppliers` | `src/lib/db/supplier-dao.ts`, `src/components/ppe/supplier-form-dialog.tsx` |
+| 2.4 Invoices | `/ppe/invoices`, `/ppe/invoices/new`, `/ppe/invoices/[id]`, `/api/ppe/invoices` (`?id=` for one invoice) | `src/lib/db/invoice-dao.ts`, `src/components/ppe/invoice-form.tsx` |
+| 2.5 Grower charges | `/ppe/grower-charges`, `/api/ppe/grower-charges` | `src/lib/db/grower-charge-dao.ts`, `src/components/ppe/grower-charge-form-dialog.tsx` |
+| 2.6 Stock | `/ppe/stock`, `/api/ppe/stock`, `/api/ppe/stock/adjustments` | `src/lib/db/stock-dao.ts`, `src/components/ppe/stock-adjustment-form-dialog.tsx`, `src/lib/constants/ppe.ts` |
+| 2.7 Report | `/ppe/report`, `/api/ppe/report` | `src/lib/db/ppe-report-dao.ts`, `src/app/ppe/report/page.tsx` |
+| 2.8 Wrap-up | n/a | `PPENav` tabs: Issues, Items, Stock, Invoices, Suppliers, Grower Charges, Report |
+
+Shared pieces added in Phase 2:
+- `BaseDAO.withTransaction(fn)` gives `fn` a `{ query, request }` bound to one transaction;
+  it commits on success and rolls back and rethrows on error. Used by driver rename/delete and
+  invoice save. `decimalParam(value, precision)` sends money/quantities as `DECIMAL(p,2)`.
+- `src/lib/db/sql-errors.ts`: `isUniqueViolation` / `isConstraintConflict` (error 2627/2601 and 547,
+  optionally by constraint name). DAOs turn these into friendly `ValidationError`s; they back up the
+  explicit pre-checks (duplicate names, records in use) when two users race.
+- `src/lib/money.ts` (`toCents`, `sumMoney`, `lineTotal`, `hasAtMostTwoDecimals`): client totals
+  match SQL Server's `DECIMAL` maths. Schemas reject more than 2 decimals instead of rounding.
+- `src/hooks/use-api-data.ts` (`useApiData(url, empty)`): GET + reload, ignores stale responses.
+  `usePPEItems` now uses it.
+- `ConfirmActionDialog` (non-destructive confirm, used for "Deactivate instead") and `ActiveBadge`.
+- `formatDisplayDate` treats `yyyy-MM-dd` strings as local dates; `DATE` columns are returned as
+  `yyyy-MM-dd` strings (`CONVERT(char(10), …, 23)`) and parsed with `fromDateOnly`.
+- Zod `dateOnly` now rejects impossible dates such as `2026-02-30` (previously a SQL error / 500).
+
+Behaviour worth knowing:
+- **Drivers**: the transport form only offers active drivers. When editing a record whose driver
+  is inactive or not in the list, that name stays selectable, labelled "(inactive)" or
+  "(not in driver list)". The server enforces the same rule: new records need an active driver;
+  an edit may keep the record's existing name. Names match case-insensitively and ignore
+  surrounding spaces (the column collation is `CI`). Renaming a driver rewrites every
+  `TTransport.Driver` that matches the old name, in the same transaction. Deleting is refused
+  while any transport row uses the name; the UI offers Deactivate instead.
+- **Suppliers**: names are unique (case-insensitive). New invoices need an active supplier; an
+  existing invoice may keep its now-inactive supplier. Suppliers with invoices can only be
+  deactivated.
+- **Invoices**: save replaces all lines in one transaction. Duplicate (supplier, invoice no) is
+  rejected with the date of the existing invoice. The line's "Set deduction price to R x" link is
+  the only thing that changes `PPE_Item_Value`; saving never does.
+- **PPE items** can no longer be deleted once used by a PPE issue, invoice line or stock
+  adjustment (the last two also have FKs).
+- **Stock adjustments** must be dated on or after `PPE_STOCK_TRACKING_START`. Quantities are
+  signed, non-zero and may have up to 2 decimals (the input uses `step={0.01}`), matching
+  fractional invoice quantities.
+- **Report**: defaults to the financial year to date (`FINANCIAL_YEAR_START_MONTH = 3`, i.e.
+  1 March; the user has not been asked to confirm). It counts a PPE issue as a `TDeductions` row with
+  `PPE` set, **except** the 20 legacy rows with `PPE = 0` and no item, which are loan-only rows
+  from the old combined screen. Per-item "Difference" is only shown where the item was purchased
+  in the period. A banner warns when the range starts before invoices were captured.
+
+Not verified by hand (writes would hit production): clicking Save on any new form, the
+"Save & Add Another" focus move, and the "Set deduction price" link. The underlying DAO/SQL paths
+were exercised in rolled-back transactions; the UI was checked visually without saving.
+
+An independent review of all Phase 2 changes found one issue, now fixed: the stock adjustment
+quantity input used `step={1}`, so the browser blocked decimal adjustments such as `-0.5`.
+
+The original Phase 2 specification follows for reference.
 
 ### 2.1 Issue PPE form field order (small)
 In `src/components/ppe/ppe-issue-form-dialog.tsx`, lay the fields out in this order,

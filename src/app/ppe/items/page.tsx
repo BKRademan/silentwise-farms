@@ -99,8 +99,12 @@ export default function PPEItemsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              disabled={item.IssueCount > 0}
-                              title={item.IssueCount > 0 ? 'Items that have been issued cannot be deleted' : undefined}
+                              disabled={isItemInUse(item)}
+                              title={
+                                isItemInUse(item)
+                                  ? 'Items that have been issued, purchased or stock-adjusted cannot be deleted'
+                                  : undefined
+                              }
                               onClick={() => setDeleting(item)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -127,4 +131,8 @@ export default function PPEItemsPage() {
       </div>
     </div>
   );
+}
+
+function isItemInUse(item: PPEItemWithUsage): boolean {
+  return item.IssueCount + item.InvoiceLineCount + item.AdjustmentCount > 0;
 }

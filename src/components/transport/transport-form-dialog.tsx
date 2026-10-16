@@ -22,13 +22,14 @@ import { useData } from '@/lib/contexts/data-context';
 import { toDateOnlyFromDateParts } from '@/lib/date-time/south-africa';
 import { formatCurrency } from '@/lib/format';
 import type { TransportInputBody } from '@/lib/validations/capture';
-import type { TransportRecord } from '@/types/database';
+import type { TransportDriver, TransportRecord } from '@/types/database';
 
 interface TransportFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   record?: TransportRecord;
-  drivers: string[];
+  /** All drivers (active first); only active ones are offered for new selections. */
+  drivers: TransportDriver[];
   onSaved: () => void;
 }
 
@@ -47,6 +48,10 @@ export function TransportFormDialog({ open, onOpenChange, record, drivers, onSav
   const [form, setForm] = useState<FormState>(emptyForm());
   const [isSaving, setIsSaving] = useState(false);
   const isEdit = Boolean(record);
+  const recordDriver = useMemo(
+    () => (record ? findDriver(drivers, record.Driver)?.Driver_Name ?? record.Driver?.trim() ?? '' : ''),
+    [drivers, record]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -57,17 +62,18 @@ export function TransportFormDialog({ open, onOpenChange, record, drivers, onSav
             date: new Date(record.Date),
             days: String(record.Days),
             ratePerDay: record.RatePerDay,
-            driver: record.Driver ?? '',
+            driver: recordDriver,
             comment: record.Comment ?? '',
           }
-        : { ...emptyForm(), driver: drivers[0] ?? '' }
+        : { ...emptyForm(), driver: drivers.find((d) => d.Is_Active)?.Driver_Name ?? '' }
     );
-  }, [open, record, drivers]);
+  }, [open, record, drivers, recordDriver]);
 
   const growerOptions = useMemo(
     () => growers.map((g) => ({ value: String(g.ID), label: g.GrowerName || 'Unnamed Grower' })),
     [growers]
   );
+  const driverOptions = useMemo(() => buildDriverOptions(drivers, recordDriver), [drivers, recordDriver]);
   const selectedGrower = growers.find((g) => String(g.ID) === form.growerId);
   const growerRate = selectedGrower?.RatePerKM ?? null;
   const days = Number(form.days);
@@ -180,19 +186,13 @@ export function TransportFormDialog({ open, onOpenChange, record, drivers, onSav
 
           <div className="space-y-2">
             <Label htmlFor="transport-driver">Driver</Label>
-            <Input
+            <Combobox
               id="transport-driver"
-              list="transport-drivers"
+              options={driverOptions}
               value={form.driver}
-              maxLength={50}
-              placeholder="Select or type a driver"
-              onChange={(e) => update({ driver: e.target.value })}
+              onValueChange={(driver) => update({ driver })}
+              placeholder="Select driver"
             />
-            <datalist id="transport-drivers">
-              {drivers.map((driver) => (
-                <option key={driver} value={driver} />
-              ))}
-            </datalist>
           </div>
 
           <div className="space-y-2">
@@ -221,4 +221,20 @@ export function TransportFormDialog({ open, onOpenChange, record, drivers, onSav
 
 function emptyForm(): FormState {
   return { growerId: '', date: new Date(), days: '1', ratePerDay: null, driver: '', comment: '' };
+}
+
+/** Driver names match case-insensitively and ignoring surrounding spaces, like the database. */
+function findDriver(drivers: TransportDriver[], name: string | null | undefined): TransportDriver | undefined {
+  const key = name?.trim().toLowerCase();
+  return key ? drivers.find((d) => d.Driver_Name.toLowerCase() === key) : undefined;
+}
+
+/** Active drivers, plus the edited record's driver when it is inactive or not in the list. */
+function buildDriverOptions(drivers: TransportDriver[], recordDriver: string) {
+  const options = drivers.filter((d) => d.Is_Active).map((d) => ({ value: d.Driver_Name, label: d.Driver_Name }));
+  if (recordDriver && !options.some((option) => option.value === recordDriver)) {
+    const suffix = findDriver(drivers, recordDriver) ? 'inactive' : 'not in driver list';
+    options.unshift({ value: recordDriver, label: `${recordDriver} (${suffix})` });
+  }
+  return options;
 }

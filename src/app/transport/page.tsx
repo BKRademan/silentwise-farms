@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { subDays } from 'date-fns';
-import { Building2, CalendarDays, Edit2, Plus, RefreshCw, Trash2, Wallet } from 'lucide-react';
+import { Building2, CalendarDays, Edit2, Plus, RefreshCw, Trash2, UserCog, Wallet } from 'lucide-react';
 import { DateRangeFields } from '@/components/filters/date-range-fields';
 import { TransportFormDialog } from '@/components/transport/transport-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,7 @@ import { apiRequest } from '@/lib/api-client';
 import { useData } from '@/lib/contexts/data-context';
 import { toDateOnlyFromDateParts } from '@/lib/date-time/south-africa';
 import { formatCurrency, formatDisplayDate } from '@/lib/format';
-import type { TransportRecord } from '@/types/database';
+import type { TransportDriverWithUsage, TransportRecord } from '@/types/database';
 
 export default function TransportPage() {
   const { growers } = useData();
@@ -26,7 +27,7 @@ export default function TransportPage() {
   const [endDate, setEndDate] = useState<Date>(() => new Date());
   const [growerId, setGrowerId] = useState('');
   const [records, setRecords] = useState<TransportRecord[]>([]);
-  const [drivers, setDrivers] = useState<string[]>([]);
+  const [drivers, setDrivers] = useState<TransportDriverWithUsage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -58,11 +59,11 @@ export default function TransportPage() {
 
   const loadDrivers = useCallback(async () => {
     try {
-      setDrivers(await apiRequest<string[]>('/api/transport/drivers'));
-    } catch {
-      // the driver list is only a suggestion source; the form still accepts typed names
+      setDrivers(await apiRequest<TransportDriverWithUsage[]>('/api/transport/drivers?all=1'));
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Could not load drivers', description: (err as Error).message });
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadRecords();
@@ -118,6 +119,12 @@ export default function TransportPage() {
             <Button onClick={loadRecords} disabled={isLoading} size="sm" variant="outline" className="h-8 px-2 sm:h-10 sm:px-4">
               <RefreshCw className="h-4 w-4 mr-1 sm:mr-2" />
               Refresh
+            </Button>
+            <Button asChild size="sm" variant="outline" className="h-8 px-2 sm:h-10 sm:px-4">
+              <Link href="/transport/drivers">
+                <UserCog className="h-4 w-4 mr-1 sm:mr-2" />
+                Manage Drivers
+              </Link>
             </Button>
             <Button onClick={openCreate} size="sm" className="h-8 px-2 sm:h-10 sm:px-4">
               <Plus className="h-4 w-4 mr-1 sm:mr-2" />

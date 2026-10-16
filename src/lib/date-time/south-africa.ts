@@ -101,3 +101,16 @@ export function toDateOnlyFromDateParts(date: Date): string {
   assertValidDate(date, date);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
+
+/** True only for a real calendar day in `yyyy-MM-dd` form (rejects e.g. 2026-02-30). */
+export function isValidDateOnly(value: string): boolean {
+  return dateOnlyPattern.test(value) && addDaysToDateOnly(value, 0) === value;
+}
+
+/** Local-midnight Date for a `yyyy-MM-dd` value (the inverse of `toDateOnlyFromDateParts`), else null. */
+export function fromDateOnly(value: string): Date | null {
+  const match = value.match(dateOnlyPattern);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}

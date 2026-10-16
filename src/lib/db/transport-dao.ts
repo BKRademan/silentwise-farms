@@ -44,16 +44,6 @@ export class TransportDAO extends BaseDAO<TransportRecord> {
     );
   }
 
-  async listDrivers(): Promise<string[]> {
-    const rows = await this.executeQuery<{ Driver: string }>(
-      `SELECT Driver FROM ${this.tableName}
-       WHERE NULLIF(LTRIM(RTRIM(Driver)), '') IS NOT NULL
-       GROUP BY Driver
-       ORDER BY MAX(Date) DESC`
-    );
-    return rows.map((row) => row.Driver);
-  }
-
   async add(input: TransportInput): Promise<{ ID: number }> {
     const result = await this.executeQuery<{ ID: number }>(
       `INSERT INTO ${this.tableName} (Grower_ID_FK, Date, KM, RatePerKM, Driver, Comment)

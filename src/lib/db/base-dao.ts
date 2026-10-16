@@ -1,6 +1,45 @@
 import sql from 'mssql';
 import { getDbConfig } from '../db-config';
 
+export type QueryParams = Record<string, any>;
+
+/** A parameter with an explicit SQL type; untyped params let `mssql` infer one from the JS value. */
+export interface TypedParam {
+  sqlType: sql.ISqlType;
+  value: unknown;
+}
+
+/** DECIMAL parameter, so money/quantities reach SQL Server exactly instead of as FLOAT. */
+export function decimalParam(value: number | null, precision: number, scale = 2): TypedParam {
+  return { sqlType: sql.Decimal(precision, scale), value };
+}
+
+/** Runs statements on one open transaction; created by `BaseDAO.withTransaction`. */
+export interface TransactionContext {
+  /** New request bound to the transaction, for anything `query` doesn't cover. */
+  request: () => sql.Request;
+  query: <R>(query: string, params?: QueryParams) => Promise<R[]>;
+}
+
+function isTypedParam(value: unknown): value is TypedParam {
+  return typeof value === 'object' && value !== null && 'sqlType' in value;
+}
+
+function bindParams(request: sql.Request, params?: QueryParams): sql.Request {
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (isTypedParam(value)) {
+        console.log(`Adding parameter ${key}: ${value.value}`);
+        request.input(key, value.sqlType, value.value);
+        return;
+      }
+      console.log(`Adding parameter ${key}: ${value}`);
+      request.input(key, value);
+    });
+  }
+  return request;
+}
+
 export class BaseDAO<T> {
   protected tableName: string;
   private static pool: sql.ConnectionPool | null = null;
@@ -69,22 +108,14 @@ export class BaseDAO<T> {
     }
   }
 
-  protected async executeQuery<R>(query: string, params?: Record<string, any>): Promise<R[]> {
+  protected async executeQuery<R>(query: string, params?: QueryParams): Promise<R[]> {
     let retryCount = 0;
     const maxRetries = 3;
     
     while (retryCount < maxRetries) {
       try {
         const pool = await this.getConnection();
-        const request = pool.request();
-
-        // Add parameters to the request if they exist
-        if (params) {
-          Object.entries(params).forEach(([key, value]) => {
-            console.log(`Adding parameter ${key}: ${value}`);
-            request.input(key, value);
-          });
-        }
+        const request = bindParams(pool.request(), params);
 
         console.log('Executing query:', query);
         const result = await request.query<R>(query);
@@ -123,6 +154,40 @@ export class BaseDAO<T> {
     }
     
     throw new Error(`Failed to execute query after ${maxRetries} attempts`);
+  }
+
+  /**
+   * Runs `fn` inside a single transaction: commits if it resolves, rolls back and rethrows if it
+   * throws. Statements must be awaited one at a time (a transaction holds one connection).
+   * Not retried on connection errors, because a half-applied transaction cannot be replayed safely.
+   */
+  protected async withTransaction<R>(fn: (tx: TransactionContext) => Promise<R>): Promise<R> {
+    const pool = await this.getConnection();
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    const tx: TransactionContext = {
+      request: () => new sql.Request(transaction),
+      query: async <Q>(query: string, params?: QueryParams) => {
+        console.log('Executing query (transaction):', query);
+        const result = await bindParams(new sql.Request(transaction), params).query<Q>(query);
+        return result.recordset ?? [];
+      },
+    };
+
+    try {
+      const result = await fn(tx);
+      await transaction.commit();
+      return result;
+    } catch (error) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        // SQL Server may already have rolled back (e.g. XACT_ABORT); the original error matters more.
+        console.error(`Rollback failed for ${this.tableName}:`, rollbackError);
+      }
+      throw error;
+    }
   }
 
   protected async executeProcedure<R>(

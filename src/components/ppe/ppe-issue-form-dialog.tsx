@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -43,6 +43,7 @@ export function PPEIssueFormDialog({ open, onOpenChange, issue, items, onSaved }
   const [form, setForm] = useState<FormState>(emptyForm());
   const [isSaving, setIsSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const employeeRef = useRef<HTMLButtonElement>(null);
   const isEdit = Boolean(issue);
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function PPEIssueFormDialog({ open, onOpenChange, issue, items, onSaved }
       toast({
         variant: 'destructive',
         title: 'Missing details',
-        description: 'Select an employee, date and item, and enter the amount.',
+        description: 'Select a date, employee and item, and enter the amount.',
       });
       return;
     }
@@ -110,6 +111,7 @@ export function PPEIssueFormDialog({ open, onOpenChange, issue, items, onSaved }
         update({ employeeId: '' });
         setSavedCount((n) => n + 1);
         toast({ title: 'PPE issue added', description: 'Select the next employee.' });
+        requestAnimationFrame(() => employeeRef.current?.focus());
       } else {
         toast({ title: isEdit ? 'PPE issue updated' : 'PPE issue added' });
         onOpenChange(false);
@@ -139,42 +141,49 @@ export function PPEIssueFormDialog({ open, onOpenChange, issue, items, onSaved }
           }}
           className="space-y-4"
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Date *</Label>
-              <DatePicker date={form.date} onSelect={(date) => update({ date })} disableFuture />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ppe-issue-amount">Amount (R) *</Label>
-              <Input
-                id="ppe-issue-amount"
-                type="number"
-                min={0}
-                step={0.01}
-                value={form.amount}
-                onChange={(e) => update({ amount: e.target.value })}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Date *</Label>
+            <DatePicker date={form.date} onSelect={(date) => update({ date })} disableFuture />
           </div>
 
           <div className="space-y-2">
-            <Label>PPE item *</Label>
-            <Combobox options={itemOptions} value={form.itemId} onValueChange={handleItemChange} placeholder="Select item" />
-            {selectedItem && form.amount !== '' && Number(form.amount) !== selectedItem.PPE_Item_Value && (
-              <p className="text-xs text-amber-700">
-                Differs from the item&apos;s deduction price of {formatCurrency(selectedItem.PPE_Item_Value)}.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Employee *</Label>
+            <Label htmlFor="ppe-issue-employee">Employee *</Label>
             <Combobox
+              ref={employeeRef}
+              id="ppe-issue-employee"
               options={employeeOptions}
               value={form.employeeId}
               onValueChange={(employeeId) => update({ employeeId })}
               placeholder="Select employee"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ppe-issue-item">PPE item *</Label>
+            <Combobox
+              id="ppe-issue-item"
+              options={itemOptions}
+              value={form.itemId}
+              onValueChange={handleItemChange}
+              placeholder="Select item"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ppe-issue-amount">Amount (R) *</Label>
+            <Input
+              id="ppe-issue-amount"
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.amount}
+              onChange={(e) => update({ amount: e.target.value })}
+            />
+            {selectedItem && form.amount !== '' && Number(form.amount) !== selectedItem.PPE_Item_Value && (
+              <p className="text-xs text-amber-700">
+                Differs from the item&apos;s deduction price of {formatCurrency(selectedItem.PPE_Item_Value)}.
+              </p>
+            )}
           </div>
 
           <DialogFooter className="gap-2">

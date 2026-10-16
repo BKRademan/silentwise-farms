@@ -64,7 +64,10 @@ PPE (Personal Protective Equipment) items reference table.
 
 ### dbo.TDeductions
 Deductions transaction table. Each PPE issue to an employee is one row with `PPE`
-set to the amount deducted. `Loans` has not been captured since 2023.
+set to the amount deducted. `Loans` has not been captured since 2023. 20 legacy loan-only
+rows have `PPE = 0` and no `FK_PPE_Item`; the PPE report and stock count exclude them
+(an issue is `PPE IS NOT NULL AND (FK_PPE_Item IS NOT NULL OR PPE <> 0)`). There is no FK from
+`FK_PPE_Item` to `TPPE_Items`, so the app checks for issues itself before deleting an item.
 
 | Column | Type | Nullable | Description |
 |--------|------|----------|-------------|
@@ -113,7 +116,7 @@ All money columns are **excluding VAT**. See `docs/plans/phase-2-ppe-invoices.md
 | Column | Type | Description |
 |--------|------|-------------|
 | ID | int PK | Identity |
-| Driver_Name | nvarchar(50), unique | Matches the text stored in `TTransport.Driver` |
+| Driver_Name | nvarchar(50), unique | Matches the text stored in `TTransport.Driver` (no FK). The app's rename updates matching `TTransport.Driver` rows in the same transaction. |
 | Is_Active | bit | Inactive drivers are hidden from capture but kept for history |
 | Created_At | datetime2 | Audit |
 
