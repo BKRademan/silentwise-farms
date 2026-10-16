@@ -1,0 +1,1 @@
+SELECT * FROM TM_CA_EmpCheck_View WHERE Employee_ID_FK = {{cboEmployee.value}} AND Work_Date = {{txtDate.value}};

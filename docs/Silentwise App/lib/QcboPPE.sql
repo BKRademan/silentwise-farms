@@ -1,0 +1,1 @@
+SELECT ID, PPE_Item, PPE_Item_Value FROM dbo.TPPE_Items;

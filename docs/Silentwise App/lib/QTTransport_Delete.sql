@@ -1,0 +1,1 @@
+DELETE FROM TTransport WHERE ID = {{txtID_TransEdit.value}};

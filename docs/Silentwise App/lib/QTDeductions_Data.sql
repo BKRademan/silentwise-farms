@@ -1,0 +1,1 @@
+Select * From dbo.TDeductions_Data_View WHERE DeductionDate = {{ txtDate_PPE.value }} AND PPE_ID = {{ cboPPE_Item.value }} ORDER BY ID DESC;

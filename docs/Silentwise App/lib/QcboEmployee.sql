@@ -1,0 +1,1 @@
+SELECT ID, EmplNo as Employee FROM TEmployee_Details;

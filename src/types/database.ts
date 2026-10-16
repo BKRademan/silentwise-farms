@@ -71,13 +71,42 @@ export interface Grower {
   HrsPerDay: number | null;
 }
 
-export interface Deduction {
+/**
+ * Row from `dbo.TTransport`. The table's `KM` column holds the number of days and
+ * `RatePerKM` holds the rate per day; the DAO aliases them to `Days` / `RatePerDay`.
+ */
+export interface TransportRecord {
   ID: number;
-  Loans: number | null;
-  PPE: number | null;
-  Date: Date | string | null;
-  FK_Emp_ID: string | null;
-  FK_PPE_Item: number | null;
+  Grower_ID_FK: number;
+  GrowerName: string | null;
+  Date: Date | string;
+  Days: number;
+  RatePerDay: number | null;
+  Driver: string | null;
+  Comment: string | null;
+}
+
+/** Matches `dbo.TPPE_Items`. `PPE_Item_Value` is the price deducted from an employee. */
+export interface PPEItem {
+  ID: number;
+  PPE_Item: string | null;
+  PPE_Item_Value: number | null;
+}
+
+export interface PPEItemWithUsage extends PPEItem {
+  IssueCount: number;
+  LastIssued: Date | string | null;
+}
+
+/** PPE issued to an employee, stored as a `dbo.TDeductions` row with `PPE` set. */
+export interface PPEIssue {
+  ID: number;
+  Date: Date | string;
+  EmployeeID: number | null;
+  Employee: string | null;
+  PPEItemID: number | null;
+  PPE_Item: string | null;
+  Amount: number;
 }
 
 export interface HourRecord {

@@ -1,140 +1,84 @@
 import { BaseDAO } from './base-dao';
-import { Deduction } from '@/types/database';
-import { addDaysToDateOnly, toSouthAfricaDateOnly, toSqlDateTimeStartOfDay } from '@/lib/date-time/south-africa';
+import { PPEIssue } from '@/types/database';
+import { addDaysToDateOnly, toSqlDateTimeStartOfDay } from '@/lib/date-time/south-africa';
 
-export class DeductionsDAO extends BaseDAO<Deduction> {
+export interface PPEIssueFilters {
+  startDate: string;
+  endDate: string;
+  employeeId?: number;
+  ppeItemId?: number;
+}
+
+export interface PPEIssueInput {
+  Date: string;
+  EmployeeID: number;
+  PPEItemID: number;
+  Amount: number;
+}
+
+/**
+ * PPE issues live in `dbo.TDeductions` (the legacy `Loans` column is no longer captured).
+ * `FK_Emp_ID` is nvarchar holding `TEmployee_Details.ID`, hence the TRY_CAST join.
+ */
+export class DeductionsDAO extends BaseDAO<PPEIssue> {
   constructor() {
     super('dbo.TDeductions');
   }
 
-  private formatSQLDate(date: Date | string | null | undefined): string | null {
-    return toSqlDateTimeStartOfDay(date);
-  }
-
-  private formatExclusiveEndDate(date: Date | string): string {
-    const dateOnly = toSouthAfricaDateOnly(date);
-    if (!dateOnly) throw new Error('End date is required');
-    return `${addDaysToDateOnly(dateOnly, 1)} 00:00:00.000`;
-  }
-
-  async getDeductionsByEmployee(employeeId: string): Promise<Deduction[]> {
-    return this.executeQuery<Deduction>(
-      `SELECT d.*, p.PPE_Item, e.Employee 
+  async listPPEIssues({ startDate, endDate, employeeId, ppeItemId }: PPEIssueFilters): Promise<PPEIssue[]> {
+    return this.executeQuery<PPEIssue>(
+      `SELECT d.ID, d.Date, e.ID AS EmployeeID, e.EmplNo AS Employee,
+              d.FK_PPE_Item AS PPEItemID, p.PPE_Item, CAST(d.PPE AS float) AS Amount
        FROM ${this.tableName} d
-       LEFT JOIN dbo.TPPE_Items p ON d.FK_PPE_Item = p.ID
-       LEFT JOIN dbo.TEmployee_Details e ON d.FK_Emp_ID = e.ID
-       WHERE d.FK_Emp_ID = @employeeId
-       ORDER BY d.Date DESC`,
-      { employeeId }
-    );
-  }
-
-  async getDeductionsByDateRange(startDate: Date | string, endDate: Date | string): Promise<Deduction[]> {
-    return this.executeQuery<Deduction>(
-      `SELECT d.*, p.PPE_Item, e.Employee 
-       FROM ${this.tableName} d
-       LEFT JOIN dbo.TPPE_Items p ON d.FK_PPE_Item = p.ID
-       LEFT JOIN dbo.TEmployee_Details e ON d.FK_Emp_ID = e.ID
-       WHERE d.Date >= CONVERT(datetime2, @startDate, 121)
+       LEFT JOIN dbo.TEmployee_Details e ON e.ID = TRY_CAST(d.FK_Emp_ID AS int)
+       LEFT JOIN dbo.TPPE_Items p ON p.ID = d.FK_PPE_Item
+       WHERE d.PPE IS NOT NULL
+         AND d.Date >= CONVERT(datetime2, @startDate, 121)
          AND d.Date < CONVERT(datetime2, @endDate, 121)
-       ORDER BY d.Date DESC`,
+         ${employeeId ? 'AND TRY_CAST(d.FK_Emp_ID AS int) = @employeeId' : ''}
+         ${ppeItemId ? 'AND d.FK_PPE_Item = @ppeItemId' : ''}
+       ORDER BY d.Date DESC, d.ID DESC`,
       {
-        startDate: this.formatSQLDate(startDate),
-        endDate: this.formatExclusiveEndDate(endDate),
+        startDate: toSqlDateTimeStartOfDay(startDate),
+        endDate: `${addDaysToDateOnly(endDate, 1)} 00:00:00.000`,
+        ...(employeeId ? { employeeId } : {}),
+        ...(ppeItemId ? { ppeItemId } : {}),
       }
     );
   }
 
-  async addDeduction(deduction: Omit<Deduction, 'ID'>): Promise<Deduction> {
-    const result = await this.executeQuery<Deduction>(
-      `INSERT INTO ${this.tableName} (
-        Loans, PPE, Date,
-        FK_Emp_ID, FK_PPE_Item
-      ) VALUES (
-        @loans, @ppe, CONVERT(datetime2, @date, 121),
-        @employeeId, @ppeItemId
-      );
-      SELECT SCOPE_IDENTITY() as ID;`,
-      {
-        loans: deduction.Loans,
-        ppe: deduction.PPE,
-        date: this.formatSQLDate(deduction.Date),
-        employeeId: deduction.FK_Emp_ID,
-        ppeItemId: deduction.FK_PPE_Item
-      }
+  async addPPEIssue(input: PPEIssueInput): Promise<{ ID: number }> {
+    const result = await this.executeQuery<{ ID: number }>(
+      `INSERT INTO ${this.tableName} (PPE, Date, FK_Emp_ID, FK_PPE_Item)
+       VALUES (@amount, CONVERT(datetime2, @date, 121), @employeeId, @ppeItemId);
+       SELECT CAST(SCOPE_IDENTITY() AS int) AS ID;`,
+      this.toParams(input)
     );
-
-    return {
-      ID: result[0].ID,
-      ...deduction
-    };
+    return result[0];
   }
 
-  async updateDeduction(id: number, deduction: Partial<Deduction>): Promise<void> {
-    const updates = Object.entries(deduction)
-      .filter(([key]) => key !== 'ID')
-      .map(([key]) => (
-        key === 'Date'
-          ? `${key} = CONVERT(datetime2, @${key}, 121)`
-          : `${key} = @${key}`
-      ))
-      .join(', ');
-
-    const normalizedDeduction = {
-      ...deduction,
-      Date: deduction.Date ? this.formatSQLDate(deduction.Date) : deduction.Date,
-    };
-
+  async updatePPEIssue(id: number, input: PPEIssueInput): Promise<void> {
     await this.executeQuery(
-      `UPDATE ${this.tableName} 
-       SET ${updates}
+      `UPDATE ${this.tableName}
+       SET PPE = @amount,
+           Date = CONVERT(datetime2, @date, 121),
+           FK_Emp_ID = @employeeId,
+           FK_PPE_Item = @ppeItemId
        WHERE ID = @id`,
-      {
-        ...normalizedDeduction,
-        id
-      }
+      { ...this.toParams(input), id }
     );
   }
 
-  async deleteDeduction(id: number): Promise<void> {
-    await this.executeQuery(
-      `DELETE FROM ${this.tableName} WHERE ID = @id`,
-      { id }
-    );
+  async remove(id: number): Promise<void> {
+    await this.executeQuery(`DELETE FROM ${this.tableName} WHERE ID = @id`, { id });
   }
 
-  async getDeductionSummaryByEmployee(
-    employeeId: string,
-    startDate: Date | string,
-    endDate: Date | string
-  ): Promise<{ totalLoans: number; totalPPE: number }> {
-    const result = await this.executeQuery<{ totalLoans: number; totalPPE: number }>(
-      `SELECT 
-        SUM(Loans) as totalLoans,
-        SUM(PPE) as totalPPE
-       FROM ${this.tableName}
-       WHERE FK_Emp_ID = @employeeId
-       AND Date >= CONVERT(datetime2, @startDate, 121)
-       AND Date < CONVERT(datetime2, @endDate, 121)`,
-      {
-        employeeId,
-        startDate: this.formatSQLDate(startDate),
-        endDate: this.formatExclusiveEndDate(endDate),
-      }
-    );
-
-    return result[0] || { totalLoans: 0, totalPPE: 0 };
+  private toParams(input: PPEIssueInput) {
+    return {
+      amount: input.Amount,
+      date: toSqlDateTimeStartOfDay(input.Date),
+      employeeId: String(input.EmployeeID),
+      ppeItemId: input.PPEItemID,
+    };
   }
-
-  async getDeductionsByPPEItem(ppeItemId: number): Promise<Deduction[]> {
-    return this.executeQuery<Deduction>(
-      `SELECT d.*, p.PPE_Item, e.Employee 
-       FROM ${this.tableName} d
-       LEFT JOIN dbo.TPPE_Items p ON d.FK_PPE_Item = p.ID
-       LEFT JOIN dbo.TEmployee_Details e ON d.FK_Emp_ID = e.ID
-       WHERE d.FK_PPE_Item = @ppeItemId
-       ORDER BY d.Date DESC`,
-      { ppeItemId }
-    );
-  }
-} 
+}

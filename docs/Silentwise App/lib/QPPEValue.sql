@@ -1,0 +1,1 @@
+SELECT PPE_Item_Value FROM dbo.TPPE_Items WHERE ID = {{cboPPE_Item.value}};

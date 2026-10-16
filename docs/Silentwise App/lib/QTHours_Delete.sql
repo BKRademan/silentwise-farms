@@ -1,0 +1,1 @@
+DELETE FROM THours WHERE ID = {{txtID_HoursEdit.value}};
